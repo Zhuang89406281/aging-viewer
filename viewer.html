@@ -188,6 +188,13 @@ function render(){
   h+='<option value="ALL"'+(SUBJECT_FILTER==='ALL'?' selected':'')+'>1123+1221</option>';
   h+='<option value="1123"'+(SUBJECT_FILTER==='1123'?' selected':'')+'>1123 预付账款</option>';
   h+='<option value="1221"'+(SUBJECT_FILTER==='1221'?' selected':'')+'>1221 其他应收款</option>';
+  h+='<option value="1123.01"'+(SUBJECT_FILTER==='1123.01'?' selected':'')+'>1123.01 预付账款-供应商</option>';
+  h+='<option value="1123.99"'+(SUBJECT_FILTER==='1123.99'?' selected':'')+'>1123.99 预付账款-其他</option>';
+  h+='<option value="1221.01"'+(SUBJECT_FILTER==='1221.01'?' selected':'')+'>1221.01 其他应收款-客户</option>';
+  h+='<option value="1221.02"'+(SUBJECT_FILTER==='1221.02'?' selected':'')+'>1221.02 其他应收款-员工</option>';
+  h+='<option value="1221.03"'+(SUBJECT_FILTER==='1221.03'?' selected':'')+'>1221.03 押金及保证金</option>';
+  h+='<option value="1221.04"'+(SUBJECT_FILTER==='1221.04'?' selected':'')+'>1221.04 五险一金及个税</option>';
+  h+='<option value="1221.99"'+(SUBJECT_FILTER==='1221.99'?' selected':'')+'>1221.99 内部往来</option>';
   h+='</select>';
   h+='<label>币别:</label><select class="fsel" id="curSel" onchange="setCur(this.value)">';
   h+='<option value="USD"'+(CUR_FILTER==='USD'?' selected':'')+'>USD 汇总</option>';
