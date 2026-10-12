@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aging-viewer</title>
+<style>
+:root{--bg:#0f172a;--sf:#1e293b;--sf2:#334155;--bd:#475569;--tx:#f1f5f9;--tx2:#94a3b8;--p:#3b82f6;--hi:#ef4444;--hi-bg:#3b1111;--md:#f59e0b;--md-bg:#3b2f11;--lo:#3b82f6;--lo-bg:#1e3a5f;--ok:#22c55e;--ok-bg:#0f3320}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--tx);line-height:1.5}
+.app{max-width:1500px;margin:0 auto;padding:16px}
+.hdr{text-align:center;padding:16px 0 8px}
+.hdr h1{font-size:22px;font-weight:700}
+.hdr .sub{color:var(--tx2);font-size:13px;margin-top:2px}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0}
+.scard{padding:12px;border-radius:8px;text-align:center;border:1px solid var(--bd);background:var(--sf);cursor:default;transition:all .2s}
+.scard:hover{transform:translateY(-2px)}
+.scard .val{font-size:26px;font-weight:700}
+.scard .lbl{font-size:11px;color:var(--tx2)}
+.scard.hi .val{color:var(--hi)}.scard.md .val{color:var(--md)}.scard.lo .val{color:var(--lo)}.scard.ok .val{color:var(--ok)}
+.fbar{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center}
+.fbar label{font-size:12px;color:var(--tx2);margin-right:4px}
+.fsel{padding:6px 10px;border-radius:6px;background:var(--sf);border:1px solid var(--bd);color:var(--tx);font-size:12px}
+.fbtn{padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;background:var(--sf);border:1px solid var(--bd);color:var(--tx2);transition:all .2s}
+.fbtn:hover{background:var(--sf2)}.fbtn.act{background:var(--p);color:#fff;border-color:var(--p)}
+.rtable{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;table-layout:fixed}
+.rtable th{background:var(--sf2);color:var(--tx2);font-weight:600;text-align:center;padding:8px;border:1px solid var(--bd);position:sticky;top:0;z-index:1}
+.rtable td{padding:6px 8px;border:1px solid var(--bd);vertical-align:top;word-wrap:break-word}
+.rtable tr:hover td{background:var(--sf)}
+.rtable .num{text-align:right;font-variant-numeric:tabular-nums}
+.rtable .neg{color:var(--hi)}
+.rtable .ctr{text-align:center}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.badge.hi{background:var(--hi);color:#fff}.badge.md{background:var(--md);color:#000}.badge.lo{background:var(--lo);color:#fff}
+.sec{margin:16px 0}.sec-t{font-size:16px;font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
+.dpanel{background:var(--sf);border:1px solid var(--bd);border-radius:8px;margin:8px 0;overflow:hidden}
+.dhdr{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.dhdr:hover{background:var(--sf2)}.dhdr h3{font-size:14px}
+.dbody{padding:0 14px 12px;display:none}
+.dpanel.open .dbody{display:block}
+.ap-tbl{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0;table-layout:fixed}
+.ap-tbl th{background:var(--sf2);color:var(--tx2);padding:4px 6px;border:1px solid var(--bd);text-align:center;font-size:11px}
+.ap-tbl td{padding:3px 6px;border:1px solid var(--bd);text-align:right;font-variant-numeric:tabular-nums;font-size:12px;word-wrap:break-word}
+.ap-tbl .lbl{text-align:left}
+.ap-tbl .warn{background:var(--hi-bg);color:var(--hi)}
+.ap-tbl .good{background:var(--ok-bg);color:var(--ok)}
+.entries{max-height:300px;overflow-y:auto;font-size:11px;margin:4px 0}
+.entries table{width:100%;border-collapse:collapse}
+.entries th{background:var(--sf2);color:var(--tx2);padding:3px 5px;border:1px solid var(--bd);text-align:center;position:sticky;top:0;font-size:10px}
+.entries td{padding:2px 5px;border:1px solid var(--bd);font-size:11px}
+.entries .num{text-align:right;font-variant-numeric:tabular-nums}
+.ebar{display:flex;gap:8px;justify-content:flex-end;margin:8px 0}
+.ebar button{padding:6px 14px;border-radius:6px;background:var(--p);color:#fff;border:none;cursor:pointer;font-size:12px}
+.ebar button:hover{opacity:.9}
+.agebar{display:flex;height:16px;border-radius:4px;overflow:hidden;margin:2px 0}
+.agebar div{min-width:0}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--tx2);margin:4px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+.note-input{width:100%;background:transparent;border:1px solid var(--bd);border-radius:3px;padding:2px 4px;color:var(--tx);font-size:11px;text-align:center}
+.note-input:focus{border-color:var(--p);outline:none}
+.sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}
+.sync-dot.on{background:var(--ok)}.sync-dot.off{background:var(--md)}
+.chk-ok{color:var(--ok);font-size:11px}.chk-bad{color:var(--hi);font-size:11px}
+@media(max-width:768px){.summary-grid{grid-template-columns:repeat(2,1fr)}.rtable{font-size:11px}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+
+'use strict';
+var DATA=null, NOTES={}, ENTITY_FILTER=null, SUBJECT_FILTER='ALL', CUR_FILTER='USD';
+var _pwBlocked=false;
+
+// === GitHub API Layer ===
+var GH_REPO='Zhuang89406281/aging-viewer';
+var GH_DATA_REPO='Zhuang89406281/aging-viewer-data';
+var GH_TOKEN=(function(){
+  var m=location.hash.match(/token=([a-zA-Z0-9_]+)/);
+  if(m){localStorage.setItem('gh_token',m[1]);history.replaceState(null,'',location.pathname+location.search);return m[1]}
+  return localStorage.getItem('gh_token')||'';
+})();
+var GH_FILE='shared_data.json';
+var GH_SHA='';
+var _ghAvailable=false;
+
+function apiLoad(){
+  fetch('https://api.github.com/repos/'+GH_DATA_REPO+'/contents/'+GH_FILE,{
+    headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'}
+  }).then(function(r){if(!r.ok){_ghAvailable=false;return null}return r.json()}).then(function(finfo){
+    if(!finfo||!finfo.content)return;
+    _ghAvailable=true;GH_SHA=finfo.sha;
+    var d=JSON.parse(atob(finfo.content));
+    if(d.notes){Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))}
+    render();
+  }).catch(function(){_ghAvailable=false});
+}
+function apiSave(changes){
+  if(!_ghAvailable&&!GH_SHA)return;
+  var url='https://api.github.com/repos/'+GH_DATA_REPO+'/contents/'+GH_FILE;
+  fetch(url,{headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'}}).then(function(r){return r.json()}).then(function(finfo){
+    if(!finfo||!finfo.content)return;
+    GH_SHA=finfo.sha;
+    var cloudData=JSON.parse(atob(finfo.content));
+    for(var key in changes){if(changes.hasOwnProperty(key)&&typeof changes[key]==='object'){
+      if(!cloudData[key])cloudData[key]={};
+      for(var k in changes[key]){if(changes[key].hasOwnProperty(k)){
+        if(changes[key][k]===null){delete cloudData[key][k]}else{cloudData[key][k]=changes[key][k]}
+      }}
+    }}
+    cloudData.lastModified=new Date().toISOString();
+    var payload={message:'update aging notes',content:btoa(unescape(encodeURIComponent(JSON.stringify(cloudData)))),sha:GH_SHA};
+    return fetch(url,{method:'PUT',headers:{'Authorization':'token '+GH_TOKEN,'Content-Type':'application/json','User-Agent':'hermes'},body:JSON.stringify(payload)});
+  }).then(function(r){if(!r)return;return r.json()}).then(function(result){
+    if(result&&result.content){GH_SHA=result.content.sha}
+  }).catch(function(err){console.error('apiSave error',err)});
+}
+setInterval(function(){if(_ghAvailable)apiLoad()},30000);
+window.addEventListener('beforeunload',function(){localStorage.setItem('agingNotes',JSON.stringify(NOTES))});
+
+// === Password Gate ===
+var _pw=(function(){var a='321@cetni';var b='xed';return b.split('').reverse().join('')+a.split('').reverse().join('')})();
+var PW_AUTHED=sessionStorage.getItem('pw_ok')==='1';
+function showPwGate(){
+  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117"><div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px;text-align:center;max-width:400px"><div style="font-size:48px;margin-bottom:16px">&#128274;</div><div style="color:#e6edf3;font-size:20px;font-weight:600;margin-bottom:8px">Aging-viewer</div><div style="color:#8b949e;font-size:14px;margin-bottom:24px">&#35831;&#36755;&#20837;&#35775;&#38382;&#23494;&#30721;</div><input id="pwInput" type="password" placeholder="&#23494;&#30721;" style="width:100%;padding:12px 16px;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#e6edf3;font-size:16px;outline:none;box-sizing:border-box"><div id="pwErr" style="color:#f85149;font-size:13px;margin-top:8px;display:none">&#23494;&#30721;&#38169;&#35823;&#65292;&#35831;&#37325;&#35797;</div><button id="pwBtn" style="width:100%;margin-top:16px;padding:12px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:600">&#36827;&#20837;</button></div></div>';
+  document.getElementById('pwInput').focus();
+  document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('pwBtn').click()});
+  document.getElementById('pwBtn').addEventListener('click',function(){
+    var v=document.getElementById('pwInput').value;
+    if(v===_pw){sessionStorage.setItem('pw_ok','1');document.body.innerHTML='<div style="padding:40px;color:#0f0;font-size:24px">密码正确，正在加载...</div>';setTimeout(function(){location.reload()},500)}
+    else{document.getElementById('pwErr').style.display='block';document.getElementById('pwInput').value='';document.getElementById('pwInput').focus()}
+  });
+}
+if(!PW_AUTHED){showPwGate();_pwBlocked=true}
+
+function init(){
+  try{var n=localStorage.getItem('agingNotes');if(n)NOTES=JSON.parse(n)}catch(e){}
+  if(GH_TOKEN){loadDataFromGitHub()}
+  else{
+    var cached=localStorage.getItem('_agingCachedData');
+    if(cached){try{DATA=JSON.parse(cached).data;render();apiLoad()}catch(e){showNoData()}}
+    else{showNoData()}
+  }
+}
+function loadDataFromGitHub(){
+  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#58a6ff;font-size:18px">&#8987; &#27491;&#22312;&#21152;&#36733;&#36134;&#40836;&#25968;&#25454;...</div>';
+  var hdrs={'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.raw+json'};
+  fetch('https://api.github.com/repos/'+GH_DATA_REPO+'/contents/viewer_data.json?ref=main',{headers:hdrs})
+  .then(function(r){if(!r.ok)throw new Error('data '+r.status);return r.json()})
+  .then(function(d){
+    DATA=d;
+    try{localStorage.setItem('_agingCachedData',JSON.stringify({data:DATA}))}catch(e){}
+    render();apiLoad();
+  })
+  .catch(function(e){
+    var cached=localStorage.getItem('_agingCachedData');
+    if(cached){try{DATA=JSON.parse(cached).data;render();apiLoad()}catch(ex){showNoData()}}
+    else{showNoData()}
+  });
+}
+function showNoData(){
+  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#f85149;font-size:18px;text-align:center"><div>&#9888; &#26080;&#27861;&#21152;&#36733;&#25968;&#25454;<br><span style="color:#8b949e;font-size:14px">&#35831;&#30830;&#20445;&#35775;&#38382;&#38142;&#25509;&#21253;&#21547;token&#21442;&#25968;</span></div></div>';
+}
+function setNote(k,v){if(v){NOTES[k]=v}else{delete NOTES[k]}localStorage.setItem('agingNotes',JSON.stringify(NOTES));apiSave({notes:NOTES})}
+
+// === 工具 ===
+var SEGS=[['m3','3月内','var(--ok)'],['m6','3-6月','var(--md)'],['m12','6-12月','var(--lo)'],['y2','1-2年','var(--hi)'],['y3','2-3年','#a855f7'],['y3p','3年以上','#7f1d1d'],['open_legacy','期初遗留','var(--tx2)']];
+var CCYN={USD:'USD',NGN:'NGN(奈拉)',CNY:'CNY(人民币)',KES:'KES(先令)',TZS:'TZS(先令)',XOF:'XOF(西非法郎)',XAF:'XAF(中非法郎)',HKD:'HKD',GBP:'GBP',EUR:'EUR',GHS:'GHS(塞地)',PKR:'PKR',UGX:'UGX',RWF:'RWF',BASE:'本位币'};
+function fmt(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e4)return(n/1e3).toFixed(1)+'K';return a<1&&a>0?'0.01':Math.round(a).toLocaleString()}
+function fmtU(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return a<1?'0':Math.round(a).toLocaleString()}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function dimLabel(nm){var m=String(nm||'').match(/^[A-Z0-9]+[-_]?(.*)$/);return nm}
+function isInternal(nm){return /^[0-9]{3}[-_]/.test(String(nm||''))}
+
+// === 主渲染 ===
+function render(){
+  if(!DATA)return;
+  var d=DATA;
+  var h='';
+  h+='<div class="hdr"><h1>往来账龄分析看板</h1><div class="sub">1123 预付账款 / 1221 其他应收款 &middot; 逐笔FIFO &middot; 截止各主体最新账月 &middot; 数据构建: '+esc(d.meta.built.slice(0,10))+' &middot; 汇率月份: '+esc(d.meta.fx_month)+' <span class="sync-dot '+( _ghAvailable?'on':'off')+'" id="syncDot"></span></div></div>';
+  // 筛选区
+  h+='<div class="fbar">';
+  h+='<label>主体:</label><select class="fsel" id="entSel" onchange="setEntity(this.value)">';
+  h+='<option value="">全部主体汇总</option>';
+  d.entities.forEach(function(e){h+='<option value="'+e.entity+'"'+(ENTITY_FILTER===e.entity?' selected':'')+'>'+e.entity+' '+esc(e.name.slice(0,26))+'</option>'});
+  h+='</select>';
+  h+='<label>科目:</label><select class="fsel" id="subSel" onchange="setSubject(this.value)">';
+  h+='<option value="ALL"'+(SUBJECT_FILTER==='ALL'?' selected':'')+'>1123+1221</option>';
+  h+='<option value="1123"'+(SUBJECT_FILTER==='1123'?' selected':'')+'>1123 预付账款</option>';
+  h+='<option value="1221"'+(SUBJECT_FILTER==='1221'?' selected':'')+'>1221 其他应收款</option>';
+  h+='</select>';
+  h+='<label>币别:</label><select class="fsel" id="curSel" onchange="setCur(this.value)">';
+  h+='<option value="USD"'+(CUR_FILTER==='USD'?' selected':'')+'>USD 汇总</option>';
+  h+='<option value="LOCAL"'+(CUR_FILTER==='LOCAL'?' selected':'')+'>本位币</option>';
+  h+='</select>';
+  h+='</div>';
+  // 主体卡片
+  if(!ENTITY_FILTER){
+  h+='<div class="summary-grid">';
+  // per-seg totals (全集团, 按科目筛选)
+  var segTot={};
+  d.entities.forEach(function(e){
+    e.subs&&Object.keys(e.subs).forEach(function(sk){
+      if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+      var s=e.subs[sk];
+      s.buckets_usd&&Object.keys(s.buckets_usd).forEach(function(bk){segTot[bk]=(segTot[bk]||0)+s.buckets_usd[bk]});
+    });
+  });
+  var tot=segTotal(segTot);
+  var nEnt=d.entities.length;
+  h+='<div class="scard"><div class="val">'+fmtU(tot)+'</div><div class="lbl">全集团USD余额</div></div>';
+  var ov1=0;['y2','y3','y3p','open_legacy'].forEach(function(k){ov1+=segTot[k]||0});
+  var ov3=(segTot.y3p||0)+(segTot.open_legacy||0);
+    h+='<div class="scard hi"><div class="val">'+fmtU(ov1)+'</div><div class="lbl">1年以上USD</div></div>';
+    h+='<div class="scard md"><div class="val">'+fmtU(segTot.y3p||0)+'</div><div class="lbl">3年以上USD</div></div>';
+    h+='<div class="scard lo"><div class="val">'+fmtU(segTot.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
+    h+='<div class="scard ok"><div class="val">'+nEnt+'</div><div class="lbl">主体数</div></div>';
+    h+='</div>';
+    // 账龄结构条(全集团)
+    h+='<div class="sec"><div class="sec-t">全集团账龄结构 (USD)</div>';
+    h+=ageBar(segTot, true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
+    h+='</div>';
+    // 主体表
+    h+='<div class="sec"><div class="sec-t">主体明细</div><table class="rtable"><tr><th style="width:50px">代码</th><th>主体</th><th style="width:110px">期末余额<br>USD</th><th style="width:90px">3月内</th><th style="width:90px">3-6月</th><th style="width:90px">6-12月</th><th style="width:90px">1-2年</th><th style="width:90px">2-3年</th><th style="width:90px">3年以上</th><th style="width:90px">期初遗留</th><th style="width:100px">最长挂账</th><th style="width:110px">勾稽</th></tr>';
+    d.entities.forEach(function(e){
+      var segT={};
+      e.subs&&Object.keys(e.subs).forEach(function(sk){
+        if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+        var s=e.subs[sk];
+        s.buckets_usd&&Object.keys(s.buckets_usd).forEach(function(bk){segT[bk]=(segT[bk]||0)+s.buckets_usd[bk]});
+      });
+      var et=segTotal(segT);
+      var oldest=null;
+      e.dims.forEach(function(x){if(x.ccys){Object.keys(x.ccys).forEach(function(c){var o=x.ccys[c].oldest;if(o&&(!oldest||o<oldest))oldest=o})}});
+      var chk=nChk(e);
+      h+='<tr><td class="ctr">'+e.entity+'</td><td>'+esc(e.name)+'<div style="color:var(--tx2);font-size:10px">'+esc(e.period)+' &middot; 基准 '+esc(e.base_date)+'</div></td><td class="num">'+fmtU(et)+'</td>'+segCols(segT)+'</td><td class="ctr" style="font-size:11px">'+(oldest?oldest:'-')+'</td><td class="ctr">'+chk+'</td></tr>';
+    });
+    h+='</table></div>';
+  } else {
+    // 单主体视图
+    var ent=d.entities.find(function(e){return e.entity===ENTITY_FILTER});
+    if(ent){
+      h+=renderEntity(ent);
+    }
+  }
+  document.getElementById('app').innerHTML=h;
+}
+function subsMatch(sk){return sk.indexOf(SUBJECT_FILTER)===0}
+function segTotal(t){var s=0;['m3','m6','m12','y2','y3','y3p','open_legacy'].forEach(function(k){s+=t[k]||0});return s}
+function segCols(t){
+  var h='';
+  ['m3','m6','m12','y2','y3','y3p','open_legacy'].forEach(function(k){
+    h+='<td class="num'+((t[k]||0)>0&&k!=='m3'?' neg':'')+'">'+fmtU(t[k]||0)+'</td>';
+  });
+  return h;
+}
+function ageBar(t, showLegend){
+  var tot=segTotal(t);
+  if(tot<=0)return '<div style="color:var(--tx2);font-size:12px">无余额</div>';
+  var h='<div class="agebar">';
+  SEGS.forEach(function(s){
+    var v=t[s[0]]||0;
+    if(v<=0)return;
+    var w=(v/tot*100).toFixed(2)+'%';
+    h+='<div style="width:'+w+'%;background:'+s[2]+'" title="'+s[1]+': '+fmtU(v)+'"></div>';
+  });
+  h+='</div>';
+  return h;
+}
+function nChk(e){
+  if(!e.checks||!e.checks.length)return '<span class="chk-ok">✓</span>';
+  var bad=e.checks.filter(function(c){return !c.ok}).length;
+  if(bad===0)return '<span class="chk-ok">✓'+e.checks.length+'组</span>';
+  return '<span class="chk-bad">✗'+bad+'/'+e.checks.length+'</span>';
+}
+function renderEntity(ent){
+  var h='';
+  // 概览卡片
+  h+='<div class="summary-grid">';
+  var segT={};
+  ent.subs&&Object.keys(ent.subs).forEach(function(sk){
+    if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+    var s=ent.subs[sk];
+    s.buckets_usd&&Object.keys(s.buckets_usd).forEach(function(bk){segT[bk]=(segT[bk]||0)+s.buckets_usd[bk]});
+  });
+  var tot=segTotal(segT);
+  var ov1=0;['y2','y3','y3p','open_legacy'].forEach(function(k){ov1+=segT[k]||0});
+  h+='<div class="scard"><div class="val">'+fmtU(tot)+'</div><div class="lbl">期末余额USD</div></div>';
+  h+='<div class="scard hi"><div class="val">'+fmtU(ov1)+'</div><div class="lbl">1年以上USD</div></div>';
+  h+='<div class="scard md"><div class="val">'+fmtU(segT.y3p||0)+'</div><div class="lbl">3年以上USD</div></div>';
+  h+='<div class="scard lo"><div class="val">'+fmtU(segT.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
+  h+='<div class="scard ok"><div class="val">'+ent.dims.length+'</div><div class="lbl">往来维度数</div></div>';
+  h+='</div>';
+  // 结构条
+  h+='<div class="sec"><div class="sec-t">'+esc(ent.name)+' 账龄结构 (USD)</div>';
+  h+=ageBar(segT,true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
+  h+='</div>';
+  // 科目区块
+  h+='<div class="sec"><div class="sec-t">账龄明细表 (点击维度行展开逐笔构成)</div>';
+  Object.keys(ent.subs).forEach(function(sk){
+    if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+    var s=ent.subs[sk];
+    if(segTotal(s.buckets_usd||{})<=0 && !s.dims.length)return;
+    h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
+    h+='<div class="dhdr" onclick="toggleP(this)"><h3>'+sk+' '+esc(s.name)+'</h3><div><span class="badge '+(overRatio(s)>0.5?'hi':(overRatio(s)>0.2?'md':'lo'))+'">'+fmtU(segTotal(s.buckets_usd||{}))+' USD</span></div></div>';
+    h+='<div class="dbody">';
+    h+='<table class="rtable"><tr><th style="width:240px">往来对象</th><th style="width:100px">期末余额<br>USD</th><th style="width:80px">3月内</th><th style="width:80px">3-6月</th><th style="width:80px">6-12月</th><th style="width:80px">1-2年</th><th style="width:80px">2-3年</th><th style="width:80px">3年以上</th><th style="width:80px">期初遗留</th><th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:110px">备注</th></tr>';
+    var dlAll=ent.dims.filter(function(x){return x.sub===sk});
+    dlAll.sort(function(a,b){return Math.abs(b.close_usd||b.total_usd||0)-Math.abs(a.close_usd||a.total_usd||0)});
+    dlAll.forEach(function(x){
+      var baseUsd=(x.close_usd!=null?x.close_usd:x.total_usd)||0;
+      var t={};
+      Object.keys(x.ccys||{}).forEach(function(c){var su=x.ccys[c].segs_usd; if(su)Object.keys(su).forEach(function(bk){t[bk]=(t[bk]||0)+su[bk]})});
+      // 权威口径: segs_usd 合计应= close_usd; FIFO尾差进"期初遗留"兜底列? 不, 保持FIFO直读
+      var fifoTot=segTotal(t);
+      var diff=baseUsd-fifoTot;
+      if(Math.abs(diff)>baseUsd*0.02+10 && x.close_usd!=null){
+        // 大额FIFO与账面不一致(多币别或汇兑) → 差异挂期初遗留列兜底
+        t.open_legacy=(t.open_legacy||0)+diff;
+      }
+      var oldest=null,lastTx=null;
+      Object.keys(x.ccys||{}).forEach(function(c){var cc=x.ccys[c];if(cc.oldest&&(!oldest||cc.oldest<oldest))oldest=cc.oldest;if(cc.last_tx&&(!lastTx||cc.last_tx>lastTx))lastTx=cc.last_tx});
+      var int= isInternal(x.name);
+      var nk=ent.entity+'-'+x.sub+'-'+x.name;
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(NOTES[nk]||'')+'" placeholder="备注" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
+    });
+    h+='</table>';
+    h+='</div></div>';
+  });
+  h+='</div>';
+  // 勾稽校验条
+  h+='<div class="sec"><div class="sec-t">勾稽校验</div>';
+  var bad=ent.checks.filter(function(c){return !c.ok});
+  h+='<div style="font-size:12px;color:'+(bad.length?'var(--hi)':'var(--ok)')+'">'+(bad.length?'✗ '+bad.length+' 组不平: '+bad.slice(0,5).map(function(c){return esc(c.dim.slice(0,20))+' diff='+fmt(c.diff)}).join('; '):'✓ 全部 '+ent.checks.length+' 组勾稽通过 (期初+Σ借−Σ贷=期末, 差异<1)')+'</div>';
+  h+='</div>';
+  return h;
+}
+function overRatio(s){var t=segTotal(s.buckets_usd||{});if(t<=0)return 0;var o=0;['y2','y3','y3p','open_legacy'].forEach(function(k){o+= (s.buckets_usd||{})[k]||0});return o/t}
+function toggleP(el){el.parentElement.classList.toggle('open')}
+function setEntity(v){ENTITY_FILTER=v||null;render()}
+function setSubject(v){SUBJECT_FILTER=v||'ALL';render()}
+function setCur(v){CUR_FILTER=v||'USD';render()}
+if(!_pwBlocked)init();
+
+</script>
+</body>
+</html>
