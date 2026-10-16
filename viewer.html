@@ -165,7 +165,21 @@ function showNoData(){
 function setNote(k,v){if(v){NOTES[k]=v}else{delete NOTES[k]}localStorage.setItem('agingNotes',JSON.stringify(NOTES));apiSave({notes:NOTES})}
 
 // === 工具 ===
+// 分档由数据 meta.segs 驱动(口径可切), 末尾固定追加 open_legacy(期初遗留)
 var SEGS=[['m3','3月内','var(--ok)'],['m6','3-6月','var(--md)'],['m12','6-12月','var(--lo)'],['y2','1-2年','var(--hi)'],['y3','2-3年','#a855f7'],['y3p','3年以上','#7f1d1d'],['open_legacy','期初遗留','var(--tx2)']];
+function segInit(){ if(DATA&&DATA.meta&&DATA.meta.segs){ SEGS=DATA.meta.segs.map(function(s){return [s.key,s.name,s.color]}); SEGS.push(['open_legacy','期初遗留','var(--tx2)']); } }
+function segKeys(){ return SEGS.map(function(s){return s[0]}); }
+// "1年以上"口径的段: 由 meta.segs 的 over 标记 + open_legacy 组成
+function segOverKeys(){
+  if(DATA&&DATA.meta&&DATA.meta.segs){ var ks=DATA.meta.segs.filter(function(s){return s.over}).map(function(s){return s.key}); ks.push('open_legacy'); return ks; }
+  return ['y2','y3','y3p','open_legacy'];
+}
+// "3年以上"口径的段: 最后一段(除 open_legacy) + open_legacy
+function segOver3Keys(){
+  if(DATA&&DATA.meta&&DATA.meta.segs&&DATA.meta.segs.length){ var ks=[DATA.meta.segs[DATA.meta.segs.length-1].key]; ks.push('open_legacy'); return ks; }
+  return ['y3p','open_legacy'];
+}
+
 var CCYN={USD:'USD',NGN:'NGN(奈拉)',CNY:'CNY(人民币)',KES:'KES(先令)',TZS:'TZS(先令)',XOF:'XOF(西非法郎)',XAF:'XAF(中非法郎)',HKD:'HKD',GBP:'GBP',EUR:'EUR',GHS:'GHS(塞地)',PKR:'PKR',UGX:'UGX',RWF:'RWF',BASE:'本位币'};
 function fmt(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e4)return(n/1e3).toFixed(1)+'K';return a<1&&a>0?'0.01':Math.round(a).toLocaleString()}
 function fmtU(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return a<1?'0':Math.round(a).toLocaleString()}
@@ -176,6 +190,7 @@ function isInternal(nm){return /^[0-9]{3}[-_]/.test(String(nm||''))}
 // === 主渲染 ===
 function render(){
   if(!DATA)return;
+  segInit();
   var d=DATA;
   var h='';
   h+='<div class="hdr"><h1>往来账龄分析看板</h1><div class="sub">1123 预付账款 / 1221 其他应收款 &middot; 逐笔FIFO &middot; 截止各主体最新账月 &middot; 数据构建: '+esc(d.meta.built.slice(0,10))+' &middot; 汇率月份: '+esc(d.meta.fx_month)+' <span class="sync-dot '+( _ghAvailable?'on':'off')+'" id="syncDot"></span></div></div>';
@@ -232,10 +247,10 @@ function render(){
   var totClose=0;d.entities.forEach(function(e){totClose+=entClose(e)});
   var nEnt=d.entities.length;
   h+='<div class="scard"><div class="val">'+fmtU(totClose)+'</div><div class="lbl">全集团USD余额</div></div>';
-  var ov1=0;['y2','y3','y3p','open_legacy'].forEach(function(k){ov1+=segTot[k]||0});
-  var ov3=(segTot.y3p||0)+(segTot.open_legacy||0);
+  var ov1=0;segOverKeys().forEach(function(k){ov1+=segTot[k]||0});
+  var ov3=0;segOver3Keys().forEach(function(k){ov3+=segTot[k]||0});
     h+='<div class="scard hi"><div class="val">'+fmtU(ov1)+'</div><div class="lbl">1年以上USD</div></div>';
-    h+='<div class="scard md"><div class="val">'+fmtU(segTot.y3p||0)+'</div><div class="lbl">3年以上USD</div></div>';
+    h+='<div class="scard md"><div class="val">'+fmtU(ov3)+'</div><div class="lbl">3年以上USD</div></div>';
     h+='<div class="scard lo"><div class="val">'+fmtU(segTot.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
     h+='<div class="scard ok"><div class="val">'+nEnt+'</div><div class="lbl">主体数</div></div>';
     h+='</div>';
@@ -244,7 +259,7 @@ function render(){
     h+=ageBar(segTot, true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
     h+='</div>';
     // 主体表
-    h+='<div class="sec"><div class="sec-t">主体明细</div><table class="rtable"><tr><th style="width:50px">代码</th><th>主体</th><th style="width:110px">期末余额<br>USD</th><th style="width:90px">3月内</th><th style="width:90px">3-6月</th><th style="width:90px">6-12月</th><th style="width:90px">1-2年</th><th style="width:90px">2-3年</th><th style="width:90px">3年以上</th><th style="width:90px">期初遗留</th><th style="width:100px">最长挂账</th><th style="width:110px">勾稽</th></tr>';
+    h+='<div class="sec"><div class="sec-t">主体明细</div><table class="rtable"><tr><th style="width:50px">代码</th><th>主体</th><th style="width:110px">期末余额<br>USD</th>'+segTh(90)+'<th style="width:100px">最长挂账</th><th style="width:110px">勾稽</th></tr>';
     d.entities.forEach(function(e){
       var segT={};
       e.subs&&Object.keys(e.subs).forEach(function(sk){
@@ -272,16 +287,18 @@ function render(){
   document.getElementById('app').innerHTML=h;
 }
 function subsMatch(sk){return sk.indexOf(SUBJECT_FILTER)===0}
-function segTotal(t){var s=0;['m3','m6','m12','y2','y3','y3p','open_legacy'].forEach(function(k){s+=t[k]||0});return s}
+function segTotal(t){var s=0;segKeys().forEach(function(k){s+=t[k]||0});return s}
 function subClose(s){return s.close_usd!=null?s.close_usd:segTotal(s.buckets_usd||{})}
 function entClose(e){var t=0;Object.keys(e.subs||{}).forEach(function(sk){if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;t+=subClose(e.subs[sk])});return t}
 function segCols(t){
   var h='';
-  ['m3','m6','m12','y2','y3','y3p','open_legacy'].forEach(function(k){
-    h+='<td class="num'+((t[k]||0)>0&&k!=='m3'?' neg':'')+'">'+fmtU(t[k]||0)+'</td>';
+  var first=segKeys()[0];
+  segKeys().forEach(function(k){
+    h+='<td class="num'+((t[k]||0)>0&&k!==first?' neg':'')+'">'+fmtU(t[k]||0)+'</td>';
   });
   return h;
 }
+function segTh(w){ return SEGS.map(function(s){return '<th style="width:'+w+'px">'+s[1]+'</th>'}).join(''); }
 function ageBar(t, showLegend){
   var tot=segTotal(t);
   if(tot<=0)return '<div style="color:var(--tx2);font-size:12px">无余额</div>';
@@ -312,10 +329,11 @@ function renderEntity(ent){
     s.buckets_usd&&Object.keys(s.buckets_usd).forEach(function(bk){segT[bk]=(segT[bk]||0)+s.buckets_usd[bk]});
   });
   var tot=segTotal(segT);
-  var ov1=0;['y2','y3','y3p','open_legacy'].forEach(function(k){ov1+=segT[k]||0});
+  var ov1=0;segOverKeys().forEach(function(k){ov1+=segT[k]||0});
+  var ov3=0;segOver3Keys().forEach(function(k){ov3+=segT[k]||0});
   h+='<div class="scard"><div class="val">'+fmtU(entClose(ent))+'</div><div class="lbl">期末余额USD</div></div>';
   h+='<div class="scard hi"><div class="val">'+fmtU(ov1)+'</div><div class="lbl">1年以上USD</div></div>';
-  h+='<div class="scard md"><div class="val">'+fmtU(segT.y3p||0)+'</div><div class="lbl">3年以上USD</div></div>';
+  h+='<div class="scard md"><div class="val">'+fmtU(ov3)+'</div><div class="lbl">3年以上USD</div></div>';
   h+='<div class="scard lo"><div class="val">'+fmtU(segT.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
   h+='<div class="scard ok"><div class="val">'+ent.dims.length+'</div><div class="lbl">往来维度数</div></div>';
   h+='</div>';
@@ -336,7 +354,7 @@ function renderEntity(ent){
     h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
     h+='<div class="dhdr" onclick="toggleP(this)"><h3>'+sk+' '+esc(s.name)+'</h3><div><span class="badge '+(overRatio(s)>0.5?'hi':(overRatio(s)>0.2?'md':'lo'))+'">'+fmtU(subClose(s))+' USD</span></div></div>';
     h+='<div class="dbody">';
-    h+='<table class="rtable"><tr><th style="width:240px">往来对象</th><th style="width:100px">期末余额<br>USD</th><th style="width:80px">3月内</th><th style="width:80px">3-6月</th><th style="width:80px">6-12月</th><th style="width:80px">1-2年</th><th style="width:80px">2-3年</th><th style="width:80px">3年以上</th><th style="width:80px">期初遗留</th><th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:110px">备注</th></tr>';
+    h+='<table class="rtable"><tr><th style="width:240px">往来对象</th><th style="width:100px">期末余额<br>USD</th>'+segTh(80)+'<th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:110px">备注</th></tr>';
     var dlAll=ent.dims.filter(function(x){return x.sub===sk});
     dlAll.sort(function(a,b){return Math.abs(b.close_usd||b.total_usd||0)-Math.abs(a.close_usd||a.total_usd||0)});
     dlAll.forEach(function(x){
@@ -373,7 +391,7 @@ function renderEntity(ent){
   }
   return h;
 }
-function overRatio(s){var t=segTotal(s.buckets_usd||{});if(t<=0)return 0;var o=0;['y2','y3','y3p','open_legacy'].forEach(function(k){o+= (s.buckets_usd||{})[k]||0});return o/t}
+function overRatio(s){var t=segTotal(s.buckets_usd||{});if(t<=0)return 0;var o=0;segOverKeys().forEach(function(k){o+= (s.buckets_usd||{})[k]||0});return o/t}
 function toggleP(el){el.parentElement.classList.toggle('open')}
 function setEntity(v){ENTITY_FILTER=v||null;render()}
 function setSubject(v){SUBJECT_FILTER=v||'ALL';render()}
