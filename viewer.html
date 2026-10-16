@@ -179,6 +179,20 @@ function render(){
   var d=DATA;
   var h='';
   h+='<div class="hdr"><h1>往来账龄分析看板</h1><div class="sub">1123 预付账款 / 1221 其他应收款 &middot; 逐笔FIFO &middot; 截止各主体最新账月 &middot; 数据构建: '+esc(d.meta.built.slice(0,10))+' &middot; 汇率月份: '+esc(d.meta.fx_month)+' <span class="sync-dot '+( _ghAvailable?'on':'off')+'" id="syncDot"></span></div></div>';
+  // 基准日 / 覆盖度 / 告警条
+  h+='<div class="sub" style="text-align:center;font-size:12px;margin-top:-4px">';
+  if(d.meta.base_date_min){
+    if(d.meta.base_date_mixed){
+      h+='<span style="color:var(--md)">&#9888; 各主体基准日不一致：'+esc(d.meta.base_date_min)+' ~ '+esc(d.meta.base_date_max)+'（全集团汇总为各主体各自最新账月末加总，非同一时点，仅供参考）</span>';
+    }else{
+      h+='<span style="color:var(--tx2)">全集团统一基准日：'+esc(d.meta.base_date_min)+'</span>';
+    }
+  }
+  if(d.meta.coverage){h+=' &middot; <span style="color:var(--tx2)">覆盖度：主体 '+d.meta.coverage.n_entities+' &middot; 明细行 '+d.meta.coverage.n_entries.toLocaleString()+' &middot; 勾稽组 '+d.meta.coverage.n_check_groups+'</span>';}
+  h+='</div>';
+  if(d.meta.warnings&&d.meta.warnings.length){
+    h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 输入体检告警 '+d.meta.warnings.length+' 条</b><div style="color:var(--tx2);margin-top:4px">'+d.meta.warnings.slice(0,20).map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
+  }
   // 筛选区
   h+='<div class="fbar">';
   h+='<label>主体:</label><select class="fsel" id="entSel" onchange="setEntity(this.value)">';
@@ -253,6 +267,8 @@ function render(){
       h+=renderEntity(ent);
     }
   }
+  // 页脚免责声明
+  h+='<div style="text-align:center;color:var(--tx2);font-size:11px;margin:24px 0 8px;border-top:1px solid var(--bd);padding-top:10px">本输出为内部作业底稿，不构成专业结论，最终判断责任在企业 &middot; 数据源：金蝶明细账逐笔导出（仅供内部分析）</div>';
   document.getElementById('app').innerHTML=h;
 }
 function subsMatch(sk){return sk.indexOf(SUBJECT_FILTER)===0}
@@ -303,6 +319,10 @@ function renderEntity(ent){
   h+='<div class="scard lo"><div class="val">'+fmtU(segT.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
   h+='<div class="scard ok"><div class="val">'+ent.dims.length+'</div><div class="lbl">往来维度数</div></div>';
   h+='</div>';
+  // 该主体输入体检告警
+  if(ent.warnings&&ent.warnings.length){
+    h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 该主体输入体检告警</b><div style="color:var(--tx2);margin-top:4px">'+ent.warnings.map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
+  }
   // 结构条
   h+='<div class="sec"><div class="sec-t">'+esc(ent.name)+' 账龄结构 (USD)</div>';
   h+=ageBar(segT,true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
