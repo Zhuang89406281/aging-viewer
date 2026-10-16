@@ -354,7 +354,7 @@ function renderEntity(ent){
     h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
     h+='<div class="dhdr" onclick="toggleP(this)"><h3>'+sk+' '+esc(s.name)+'</h3><div><span class="badge '+(overRatio(s)>0.5?'hi':(overRatio(s)>0.2?'md':'lo'))+'">'+fmtU(subClose(s))+' USD</span></div></div>';
     h+='<div class="dbody">';
-    h+='<table class="rtable"><tr><th style="width:240px">往来对象</th><th style="width:100px">期末余额<br>USD</th>'+segTh(80)+'<th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:110px">备注</th></tr>';
+    h+='<table class="rtable"><tr><th style="width:240px">往来对象</th><th style="width:100px">期末余额<br>USD</th>'+segTh(80)+'<th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:170px">变动原因<br><span style="font-weight:400">(按金额聚类)</span></th><th style="width:110px">备注</th></tr>';
     var dlAll=ent.dims.filter(function(x){return x.sub===sk});
     dlAll.sort(function(a,b){return Math.abs(b.close_usd||b.total_usd||0)-Math.abs(a.close_usd||a.total_usd||0)});
     dlAll.forEach(function(x){
@@ -365,7 +365,14 @@ function renderEntity(ent){
       Object.keys(x.ccys||{}).forEach(function(c){var cc=x.ccys[c];if(cc.oldest&&(!oldest||cc.oldest<oldest))oldest=cc.oldest;if(cc.last_tx&&(!lastTx||cc.last_tx>lastTx))lastTx=cc.last_tx});
       var int= isInternal(x.name);
       var nk=ent.entity+'-'+x.sub+'-'+x.name;
-      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(NOTES[nk]||'')+'" placeholder="备注" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
+      // 变动原因列: 主类别 + top3 占比 + 覆盖率
+      var rsn='-';
+      if(x.reason){
+        rsn='<b>'+esc(x.reason)+'</b>';
+        if(x.reason_desc)rsn+='<div style="color:var(--tx2);font-size:10px">'+esc(x.reason_desc)+'</div>';
+        if(x.reason_total)rsn+='<div style="color:var(--tx2);font-size:10px">覆盖 '+x.reason_hit+'/'+x.reason_total+' 笔</div>';
+      }
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="font-size:11px">'+rsn+'</td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(NOTES[nk]||'')+'" placeholder="备注" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
     });
     h+='</table>';
     h+='</div></div>';
