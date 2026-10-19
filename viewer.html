@@ -111,10 +111,37 @@ function apiSave(changes){
     cloudData.lastModified=new Date().toISOString();
     var payload={message:'update aging notes',content:btoa(unescape(encodeURIComponent(JSON.stringify(cloudData)))),sha:GH_SHA};
     return fetch(url,{method:'PUT',headers:{'Authorization':'token '+GH_TOKEN,'Content-Type':'application/json','User-Agent':'hermes'},body:JSON.stringify(payload)});
-  }).then(function(r){if(!r)return;return r.json()}).then(function(result){
+  }).then(function(r){
+    if(!r)return;
+    if(!r.ok){throw new Error('PUT '+r.status)}
+    return r.json();
+  }).then(function(result){
     if(result&&result.content){GH_SHA=result.content.sha}
-  }).catch(function(err){console.error('apiSave error',err)});
+    hideSaveErr();   // 保存成功 → 清除失败提示
+  }).catch(function(err){
+    console.error('apiSave error',err);
+    showSaveErr();   // 保存失败 → 显式提示(不再静默)
+  });
 }
+// === 保存失败提示条(多人并发场景防静默丢失) ===
+var _lastFailedChanges=null;  // 最近一次提交的 changes, 供重试
+function showSaveErr(){
+  var bar=document.getElementById('saveErrBar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='saveErrBar';
+    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    bar.innerHTML='&#9888; 备注保存失败(可能与他人并发编辑冲突),云端未更新 <button id="saveRetryBtn" style="padding:3px 14px;border:1px solid #fff;background:transparent;color:#fff;border-radius:4px;cursor:pointer;font-size:12px">重试保存</button><button id="saveDismissBtn" style="padding:3px 14px;border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;border-radius:4px;cursor:pointer;font-size:12px">忽略</button>';
+    document.body.appendChild(bar);
+    document.getElementById('saveRetryBtn').onclick=function(){hideSaveErr();if(_lastFailedChanges)apiSave(_lastFailedChanges)};
+    document.getElementById('saveDismissBtn').onclick=function(){hideSaveErr()};
+  }
+  bar.style.display='flex';
+}
+function hideSaveErr(){var bar=document.getElementById('saveErrBar');if(bar)bar.style.display='none'}
+// 包一层: 记录最近一次提交的 changes, 失败后可重试
+var _apiSaveRaw=apiSave;
+apiSave=function(changes){_lastFailedChanges=changes;_apiSaveRaw(changes)};
 setInterval(function(){if(_ghAvailable)apiLoad()},30000);
 window.addEventListener('beforeunload',function(){localStorage.setItem('agingNotes',JSON.stringify(NOTES))});
 
