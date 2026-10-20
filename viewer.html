@@ -218,6 +218,7 @@ function isInternal(nm){return /^[0-9]{3}[-_]/.test(String(nm||''))}
 function render(){
   if(!DATA)return;
   segInit();
+  snapshotOpenPanels();  // 渲染前记录展开状态(轮询重渲染不丢)
   var d=DATA;
   var h='';
   h+='<div class="hdr"><h1>往来账龄分析看板</h1><div class="sub">1123 预付账款 / 1221 其他应收款 &middot; 逐笔FIFO &middot; 截止各主体最新账月 &middot; 数据构建: '+esc(d.meta.built.slice(0,10))+' &middot; 汇率月份: '+esc(d.meta.fx_month)+' <span class="sync-dot '+( _ghAvailable?'on':'off')+'" id="syncDot"></span></div></div>';
@@ -312,6 +313,7 @@ function render(){
   // 页脚免责声明
   h+='<div style="text-align:center;color:var(--tx2);font-size:11px;margin:24px 0 8px;border-top:1px solid var(--bd);padding-top:10px">本输出为内部作业底稿，不构成专业结论，最终判断责任在企业 &middot; 数据源：金蝶明细账逐笔导出（仅供内部分析）</div>';
   document.getElementById('app').innerHTML=h;
+  restoreOpenPanels();  // 渲染后恢复展开状态
 }
 function subsMatch(sk){return sk.indexOf(SUBJECT_FILTER)===0}
 function segTotal(t){var s=0;segKeys().forEach(function(k){s+=t[k]||0});return s}
@@ -419,7 +421,25 @@ function renderEntity(ent){
   return h;
 }
 function overRatio(s){var t=segTotal(s.buckets_usd||{});if(t<=0)return 0;var o=0;segOverKeys().forEach(function(k){o+= (s.buckets_usd||{})[k]||0});return o/t}
-function toggleP(el){el.parentElement.classList.toggle('open')}
+// 展开状态保持: 30s轮询触发 render() 全量重建 innerHTML 会冲掉 .open class,
+// 导致"点开明细表几秒后自动收起"。渲染前记录展开的 panel id, 渲染后恢复。
+var OPEN_PANELS={};
+function snapshotOpenPanels(){
+  OPEN_PANELS={};
+  var ps=document.querySelectorAll('.dpanel.open');
+  for(var i=0;i<ps.length;i++){if(ps[i].id)OPEN_PANELS[ps[i].id]=1}
+}
+function restoreOpenPanels(){
+  for(var id in OPEN_PANELS){var el=document.getElementById(id);if(el)el.classList.add('open')}
+}
+function toggleP(el){
+  el.parentElement.classList.toggle('open');
+  // 同步记录, 避免快照间隙的点击丢失
+  if(el.parentElement.id){
+    if(el.parentElement.classList.contains('open')){OPEN_PANELS[el.parentElement.id]=1}
+    else{delete OPEN_PANELS[el.parentElement.id]}
+  }
+}
 function setEntity(v){ENTITY_FILTER=v||null;render()}
 function setSubject(v){SUBJECT_FILTER=v||'ALL';render()}
 function setCur(v){CUR_FILTER=v||'USD';render()}
