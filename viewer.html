@@ -84,13 +84,21 @@ var GH_FILE='shared_data.json';
 var GH_SHA='';
 var _ghAvailable=false;
 
+// base64 → UTF-8 JSON: atob 返回 Latin-1 字节串, 中文必须经 TextDecoder 还原,
+// 直接 JSON.parse(atob(...)) 会乱码(2026-10-20 修复)
+function b64ToJson(b64){
+  var bin=atob(b64);
+  var bytes=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++){bytes[i]=bin.charCodeAt(i)}
+  return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+}
 function apiLoad(){
   fetch('https://api.github.com/repos/'+GH_DATA_REPO+'/contents/'+GH_FILE,{
     headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'}
   }).then(function(r){if(!r.ok){_ghAvailable=false;return null}return r.json()}).then(function(finfo){
     if(!finfo||!finfo.content)return;
     _ghAvailable=true;GH_SHA=finfo.sha;
-    var d=JSON.parse(atob(finfo.content));
+    var d=b64ToJson(finfo.content);
     if(d.notes){Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))}
     render();
   }).catch(function(){_ghAvailable=false});
@@ -101,7 +109,7 @@ function apiSave(changes){
   fetch(url,{headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'}}).then(function(r){return r.json()}).then(function(finfo){
     if(!finfo||!finfo.content)return;
     GH_SHA=finfo.sha;
-    var cloudData=JSON.parse(atob(finfo.content));
+    var cloudData=b64ToJson(finfo.content);
     for(var key in changes){if(changes.hasOwnProperty(key)&&typeof changes[key]==='object'){
       if(!cloudData[key])cloudData[key]={};
       for(var k in changes[key]){if(changes[key].hasOwnProperty(k)){
