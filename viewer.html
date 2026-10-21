@@ -80,7 +80,8 @@ var GH_TOKEN=(function(){
   if(m){localStorage.setItem('gh_token',m[1]);history.replaceState(null,'',location.pathname+location.search);return m[1]}
   return localStorage.getItem('gh_token')||'';
 })();
-var GH_FILE='shared_data.json';
+var GH_FILE='shared_data_v2.json';  // v2: 2026-10-21 迁移 — 旧版页面的 atob 乱码bug会反复污染
+// shared_data.json, 换文件名让旧代码(缓存/未关标签页)永远碰不到新数据
 var GH_SHA='';
 var _ghAvailable=false;
 
