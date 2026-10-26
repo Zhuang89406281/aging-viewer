@@ -119,11 +119,21 @@ function apiSave(changes){
     if(!finfo||!finfo.content)return;
     GH_SHA=finfo.sha;
     var cloudData=b64ToJson(finfo.content);
+    // mojibake 防回流闸(2026-10-26): 历史乱码可能存在某些浏览器 localStorage 里,
+    // 随全量 NOTES 合并上传会重新污染云端。保存时过滤: 含 Ã/Â 的条目不上传,
+    // 且若云端已有该乱码 key 顺带清除(用保存触发自愈)。
     for(var key in changes){if(changes.hasOwnProperty(key)&&typeof changes[key]==='object'){
       if(!cloudData[key])cloudData[key]={};
       for(var k in changes[key]){if(changes[key].hasOwnProperty(k)){
+        var kv=String(k),vv=changes[key][k];
+        if(vv!==null&&(String(vv).indexOf('Ã')>=0||String(vv).indexOf('Â')>=0||kv.indexOf('Ã')>=0||kv.indexOf('Â')>=0)){
+          delete cloudData[key][k];  // 云端同 key 的乱码变体一并清除
+          continue;
+        }
         if(changes[key][k]===null){delete cloudData[key][k]}else{cloudData[key][k]=changes[key][k]}
       }}
+      // 云端已存在的乱码 key(本地没这个 key 才会遗留)也清掉
+      for(var ck in cloudData[key]){if(cloudData[key].hasOwnProperty(ck)&&(ck.indexOf('Ã')>=0||ck.indexOf('Â')>=0)){delete cloudData[key][ck]}}
     }}
     cloudData.lastModified=new Date().toISOString();
     var payload={message:'update aging notes',content:btoa(unescape(encodeURIComponent(JSON.stringify(cloudData)))),sha:GH_SHA};
