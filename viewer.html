@@ -101,9 +101,17 @@ function apiLoad(){
     _ghAvailable=true;GH_SHA=finfo.sha;
     var d=b64ToJson(finfo.content);
     if(d.notes){Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))}
+    // 用户正在输入备注时推迟重渲染(2026-10-26): render() 会销毁正在打字的输入框,
+    // 半截未 onchange 的文字会丢。焦点在输入框 → 只更新数据, 失焦后再补一次渲染。
+    var ae=document.activeElement;
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&(ae.className||'').indexOf('note-input')>=0){
+      _pendingRender=true;
+      return;
+    }
     render();
   }).catch(function(){_ghAvailable=false});
 }
+var _pendingRender=false;
 function apiSave(changes){
   if(!_ghAvailable&&!GH_SHA)return;
   var url='https://api.github.com/repos/'+GH_DATA_REPO+'/contents/'+GH_FILE;
@@ -198,7 +206,21 @@ function loadDataFromGitHub(){
 function showNoData(){
   document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#f85149;font-size:18px;text-align:center"><div>&#9888; &#26080;&#27861;&#21152;&#36733;&#25968;&#25454;<br><span style="color:#8b949e;font-size:14px">&#35831;&#30830;&#20445;&#35775;&#38382;&#38142;&#25509;&#21253;&#21547;token&#21442;&#25968;</span></div></div>';
 }
-function setNote(k,v){if(v){NOTES[k]=v}else{delete NOTES[k]}localStorage.setItem('agingNotes',JSON.stringify(NOTES));apiSave({notes:NOTES})}
+function setNote(k,v){
+  if(v){NOTES[k]=v}else{delete NOTES[k]}
+  localStorage.setItem('agingNotes',JSON.stringify(NOTES));
+  delete _drafts[k];  // 已正式保存, 清掉草稿
+  apiSave({notes:NOTES});
+  if(_pendingRender){_pendingRender=false;render()}  // 补上被推迟的渲染
+}
+// 草稿保护: 每敲一个字存本地(2026-10-26)。即使发生重渲染/切筛选, 草稿在渲染时回填,
+// 不再"打到一半消失"。正式保存(onchange)后清除。
+var _drafts={};
+try{_drafts=JSON.parse(localStorage.getItem('agingDrafts')||'{}')}catch(e){_drafts={}}
+function saveDraft(k,v){
+  if(v){_drafts[k]=v}else{delete _drafts[k]}
+  try{localStorage.setItem('agingDrafts',JSON.stringify(_drafts))}catch(e){}
+}
 
 // === 工具 ===
 // 分档由数据 meta.segs 驱动(口径可切), 末尾固定追加 open_legacy(期初遗留)
@@ -408,7 +430,8 @@ function renderEntity(ent){
       Object.keys(x.ccys||{}).forEach(function(c){var cc=x.ccys[c];if(cc.oldest&&(!oldest||cc.oldest<oldest))oldest=cc.oldest;if(cc.last_tx&&(!lastTx||cc.last_tx>lastTx))lastTx=cc.last_tx});
       var int= isInternal(x.name);
       var nk=ent.entity+'-'+x.sub+'-'+x.name;
-      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(NOTES[nk]||'')+'" placeholder="备注" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
+      var noteVal=NOTES[nk]||_drafts[nk]||'';  // 正式值优先, 草稿兜底(未保存的半截字)
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
     });
     h+='</table>';
     h+='</div></div>';
