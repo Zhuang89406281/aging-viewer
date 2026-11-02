@@ -58,6 +58,9 @@ body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;backgroun
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
 .note-input{width:100%;background:transparent;border:1px solid var(--bd);border-radius:3px;padding:2px 4px;color:var(--tx);font-size:11px;text-align:center}
 .note-input:focus{border-color:var(--p);outline:none}
+.coll-sel{width:100%;background:var(--sf);border:1px solid var(--bd);border-radius:3px;padding:2px 2px;color:var(--tx);font-size:11px;text-align:center;cursor:pointer}
+.coll-sel:focus{border-color:var(--p);outline:none}
+.coll-sel option{background:var(--sf);color:var(--tx)}
 .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}
 .sync-dot.on{background:var(--ok)}.sync-dot.off{background:var(--md)}
 .chk-ok{color:var(--ok);font-size:11px}.chk-bad{color:var(--hi);font-size:11px}
@@ -69,7 +72,8 @@ body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;backgroun
 <script>
 
 'use strict';
-var DATA=null, NOTES={}, ENTITY_FILTER=null, SUBJECT_FILTER='ALL', CUR_FILTER='USD';
+var DATA=null, NOTES={}, COLL={}, ENTITY_FILTER=null, SUBJECT_FILTER='ALL', CUR_FILTER='USD';
+var COLL_FILTER='ALL';  // 是否可催筛选: ALL/YES/NO(2026-11-02)
 var _pwBlocked=false;
 
 // === GitHub API Layer ===
@@ -101,10 +105,11 @@ function apiLoad(){
     _ghAvailable=true;GH_SHA=finfo.sha;
     var d=b64ToJson(finfo.content);
     if(d.notes){Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))}
-    // 用户正在输入备注时推迟重渲染(2026-10-26): render() 会销毁正在打字的输入框,
-    // 半截未 onchange 的文字会丢。焦点在输入框 → 只更新数据, 失焦后再补一次渲染。
+    if(d.collectable){Object.assign(COLL,d.collectable);try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}}
+    // 用户正在输入备注/选择可催状态时推迟重渲染(2026-10-26): render() 会销毁正在打字的输入框,
+    // 半截未 onchange 的文字会丢。焦点在输入框/下拉 → 只更新数据, 失焦后再补一次渲染。
     var ae=document.activeElement;
-    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&(ae.className||'').indexOf('note-input')>=0){
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT')&&((ae.className||'').indexOf('note-input')>=0||(ae.className||'').indexOf('coll-sel')>=0)){
       _pendingRender=true;
       return;
     }
@@ -170,7 +175,7 @@ function hideSaveErr(){var bar=document.getElementById('saveErrBar');if(bar)bar.
 var _apiSaveRaw=apiSave;
 apiSave=function(changes){_lastFailedChanges=changes;_apiSaveRaw(changes)};
 setInterval(function(){if(_ghAvailable)apiLoad()},30000);
-window.addEventListener('beforeunload',function(){localStorage.setItem('agingNotes',JSON.stringify(NOTES))});
+window.addEventListener('beforeunload',function(){localStorage.setItem('agingNotes',JSON.stringify(NOTES));try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}});
 
 // === Password Gate ===
 // 密码由构建脚本(gen_viewer_html.py)从配置注入, 源码中不再硬编码明文
@@ -190,6 +195,7 @@ if(!PW_AUTHED){showPwGate();_pwBlocked=true}
 
 function init(){
   try{var n=localStorage.getItem('agingNotes');if(n)NOTES=JSON.parse(n)}catch(e){}
+  try{var c=localStorage.getItem('agingColl');if(c)COLL=JSON.parse(c)}catch(e){}
   if(GH_TOKEN){loadDataFromGitHub()}
   else{
     var cached=localStorage.getItem('_agingCachedData');
@@ -220,8 +226,19 @@ function setNote(k,v){
   if(v){NOTES[k]=v}else{delete NOTES[k]}
   localStorage.setItem('agingNotes',JSON.stringify(NOTES));
   delete _drafts[k];  // 已正式保存, 清掉草稿
-  apiSave({notes:NOTES});
+  // 增量保存(2026-11-02 修复): 之前传全量 NOTES, 删除备注后云端旧值仍在,
+  // 30s 轮询 Object.assign 会把已删备注"复活"。改为 {k:v} / {k:null}(null=删除)。
+  var ch={};ch[k]=v||null;
+  apiSave({notes:ch});
   if(_pendingRender){_pendingRender=false;render()}  // 补上被推迟的渲染
+}
+// 是否可催(2026-11-02): 维度级催收标记, 与备注同机制云同步(shared_data_v2.json.collectable)
+function setColl(k,v){
+  if(v){COLL[k]=v}else{delete COLL[k]}
+  try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}
+  var ch={};ch[k]=v||null;
+  apiSave({collectable:ch});
+  if(_pendingRender){_pendingRender=false;render()}
 }
 // 草稿保护: 每敲一个字存本地(2026-10-26)。即使发生重渲染/切筛选, 草稿在渲染时回填,
 // 不再"打到一半消失"。正式保存(onchange)后清除。
@@ -298,6 +315,12 @@ function render(){
   h+='<label>币别:</label><select class="fsel" id="curSel" onchange="setCur(this.value)">';
   h+='<option value="USD"'+(CUR_FILTER==='USD'?' selected':'')+'>USD 汇总</option>';
   h+='<option value="LOCAL"'+(CUR_FILTER==='LOCAL'?' selected':'')+'>本位币</option>';
+  h+='</select>';
+  h+='<label>是否可催:</label><select class="fsel" id="collSel" onchange="setCollF(this.value)">';
+  h+='<option value="ALL"'+(COLL_FILTER==='ALL'?' selected':'')+'>全部</option>';
+  h+='<option value="YES"'+(COLL_FILTER==='YES'?' selected':'')+'>是</option>';
+  h+='<option value="NO"'+(COLL_FILTER==='NO'?' selected':'')+'>否</option>';
+  h+='<option value="NONE"'+(COLL_FILTER==='NONE'?' selected':'')+'>未标记</option>';
   h+='</select>';
   h+='</div>';
   // 主体卡片
@@ -423,14 +446,18 @@ function renderEntity(ent){
     if(segTotal(s.buckets_usd||{})<=0 && !s.dims.length)return;
     // 科目下无任何可见维度(全部余额为0且无备注) → 整个面板隐藏(2026-10-21)
     var visDims=ent.dims.filter(function(x){return x.sub===sk && (Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5 || NOTES[ent.entity+'-'+x.sub+'-'+x.name])});
-    if(!visDims.length && segTotal(s.buckets_usd||{})<=0)return;
-    h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
+    if(!visDims.length && segTotal(s.buckets_usd||{})<=0)return;    h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
     h+='<div class="dhdr" onclick="toggleP(this)"><h3>'+sk+' '+esc(s.name)+'</h3><div><span class="badge '+(overRatio(s)>0.5?'hi':(overRatio(s)>0.2?'md':'lo'))+'">'+fmtU(subClose(s))+' USD</span></div></div>';
     h+='<div class="dbody">';
-    h+='<table class="rtable"><tr><th style="width:240px">往来对象</th><th style="width:100px">期末余额<br>USD</th>'+segTh(80)+'<th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:110px">备注</th></tr>';
+    h+='<table class="rtable"><tr><th style="width:220px">往来对象</th><th style="width:100px">期末余额<br>USD</th>'+segTh(80)+'<th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:80px">是否可催</th><th style="width:110px">备注</th></tr>';
     // 隐藏余额为0的维度(2026-10-21): 期末余额(USD口径)为0/无余额的往来对象不显示,
     // 减少无效行; 有备注的保留(避免已填信息"消失")
-    var dlAll=ent.dims.filter(function(x){return x.sub===sk && (Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5 || NOTES[ent.entity+'-'+x.sub+'-'+x.name])});
+    // 是否可催筛选(2026-11-02): YES=标记"是", NO=标记"否", NONE=未标记; 有可催标记的行始终保留
+    var collKey=function(x){return ent.entity+'-'+x.sub+'-'+x.name};
+    var collMatch=function(x){var cv=COLL[collKey(x)];if(COLL_FILTER==='YES')return cv==='是';if(COLL_FILTER==='NO')return cv==='否';if(COLL_FILTER==='NONE')return !cv;return true};
+    var dlAll=ent.dims.filter(function(x){return x.sub===sk && (Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5 || NOTES[ent.entity+'-'+x.sub+'-'+x.name] || COLL[collKey(x)])});
+    dlAll=dlAll.filter(collMatch);
+    if(!dlAll.length)return;  // 该科目无可催筛选命中的行 → 隐藏面板
     dlAll.sort(function(a,b){return Math.abs(b.close_usd||b.total_usd||0)-Math.abs(a.close_usd||a.total_usd||0)});
     dlAll.forEach(function(x){
       var baseUsd=(x.close_usd!=null?x.close_usd:x.total_usd)||0;
@@ -441,7 +468,8 @@ function renderEntity(ent){
       var int= isInternal(x.name);
       var nk=ent.entity+'-'+x.sub+'-'+x.name;
       var noteVal=NOTES[nk]||_drafts[nk]||'';  // 正式值优先, 草稿兜底(未保存的半截字)
-      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
+      var cv=COLL[nk]||'';  // 是/否/''(未标记)
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
     });
     h+='</table>';
     h+='</div></div>';
@@ -490,6 +518,7 @@ function toggleP(el){
 function setEntity(v){ENTITY_FILTER=v||null;render()}
 function setSubject(v){SUBJECT_FILTER=v||'ALL';render()}
 function setCur(v){CUR_FILTER=v||'USD';render()}
+function setCollF(v){COLL_FILTER=v||'ALL';render()}
 if(!_pwBlocked)init();
 
 </script>
