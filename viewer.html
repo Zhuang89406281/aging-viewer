@@ -222,7 +222,20 @@ function loadDataFromGitHub(){
   });
 }
 function showNoData(){
-  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#f85149;font-size:18px;text-align:center"><div>&#9888; &#26080;&#27861;&#21152;&#36733;&#25968;&#25454;<br><span style="color:#8b949e;font-size:14px">&#35831;&#30830;&#20445;&#35775;&#38382;&#38142;&#25509;&#21253;&#21547;token&#21442;&#25968;</span></div></div>';
+  // 2026-11-09 终极保底: 手动粘贴 token 恢复入口(链接被聊天软件截断时用)
+  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;text-align:center"><div style="max-width:520px"><div style="color:#f85149;font-size:18px">&#9888; &#26080;&#27861;&#21152;&#36733;&#25968;&#25454;</div><div style="color:#8b949e;font-size:13px;margin:10px 0 18px">&#38142;&#25509;&#21487;&#33021;&#34987;&#32842;&#22825;&#36719;&#20214;&#25130;&#26029;&#25171;&#19981;&#20840;&#12290;&#25226;&#23436;&#25972;token&#31896;&#36148;&#21040;&#19979;&#38754;&#36755;&#20837;&#26694;&#65292;&#28857;&#12300;&#30830;&#35748;&#24182;&#37325;&#26032;&#21152;&#36733;&#12301;&#65306;</div><input id="tokInput" type="text" placeholder="github_pat_..." style="width:100%;padding:10px 14px;border:1px solid #30363d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:13px;outline:none;box-sizing:border-box"><button id="tokBtn" style="width:100%;margin-top:12px;padding:10px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">&#30830;&#35748;&#24182;&#37325;&#26032;&#21152;&#36733;</button><div id="tokErr" style="color:#f85149;font-size:12px;margin-top:8px;display:none">token&#30475;&#36215;&#26469;&#19981;&#23545;&#65292;&#24212;&#20197; github_pat_ &#25110; gho_ &#24320;&#22836;</div></div></div>';
+  var btn=document.getElementById('tokBtn');
+  btn.onclick=function(){
+    var v=document.getElementById('tokInput').value.trim();
+    if(!/^(github_pat_|gho_|ghp_)[A-Za-z0-9_]+$/.test(v)){
+      document.getElementById('tokErr').style.display='block';return;
+    }
+    localStorage.setItem('gh_token',v);
+    location.href=location.pathname;  // 清掉可能残缺的查询串
+    location.reload();
+  };
+  document.getElementById('tokInput').addEventListener('keydown',function(e){if(e.key==='Enter')btn.click()});
+  document.getElementById('tokInput').focus();
 }
 function setNote(k,v){
   if(v){NOTES[k]=v}else{delete NOTES[k]}
