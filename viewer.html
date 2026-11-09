@@ -355,7 +355,7 @@ function render(){
     h+=ageBar(segTot, true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
     h+='</div>';
     // 主体表
-    h+='<div class="sec"><div class="sec-t">主体明细</div><table class="rtable"><tr><th style="width:50px">代码</th><th>主体</th><th style="width:110px">期末余额<br>USD</th>'+segTh(90)+'<th style="width:100px">最长挂账</th><th style="width:110px">勾稽</th></tr>';
+    h+='<div class="sec"><div class="sec-t">主体明细</div><table class="rtable"><tr><th style="width:50px">代码</th><th>主体</th><th style="width:105px">期末余额<br>USD</th><th style="width:90px">10月变动<br>USD</th>'+segTh(85)+'<th style="width:95px">最长挂账</th><th style="width:105px">勾稽</th></tr>';
     d.entities.forEach(function(e){
       var segT={};
       e.subs&&Object.keys(e.subs).forEach(function(sk){
@@ -365,10 +365,16 @@ function render(){
       });
       var et=segTotal(segT);
       var eClose=entClose(e);
+      // 10月变动: Σ该主体可见维度的 delta_usd(与 entClose 同筛选口径); 全部null→'-'
+      var eDelta=0,eHasDelta=false;
+      e.dims.forEach(function(x){
+        if(x.delta_usd!=null){eDelta+=x.delta_usd;eHasDelta=true}
+      });
+      var dCell=eHasDelta?'<td class="num" style="color:'+(eDelta>0.5?'var(--hi)':(eDelta<-0.5?'var(--ok)':'var(--tx2)'))+'">'+(eDelta>0?'+':'')+fmtU(eDelta)+'</td>':'<td class="ctr" style="color:var(--tx2)">-</td>';
       var oldest=null;
       e.dims.forEach(function(x){if(x.ccys){Object.keys(x.ccys).forEach(function(c){var o=x.ccys[c].oldest;if(o&&(!oldest||o<oldest))oldest=o})}});
       var chk=nChk(e);
-      h+='<tr><td class="ctr">'+e.entity+'</td><td>'+esc(e.name)+'<div style="color:var(--tx2);font-size:10px">'+esc(e.period)+' &middot; 基准 '+esc(e.base_date)+'</div></td><td class="num">'+fmtU(eClose)+'</td>'+segCols(segT)+'</td><td class="ctr" style="font-size:11px">'+(oldest?oldest:'-')+'</td><td class="ctr">'+chk+'</td></tr>';
+      h+='<tr><td class="ctr">'+e.entity+'</td><td>'+esc(e.name)+'<div style="color:var(--tx2);font-size:10px">'+esc(e.period)+' &middot; 基准 '+esc(e.base_date)+'</div></td><td class="num">'+fmtU(eClose)+'</td>'+dCell+segCols(segT)+'</td><td class="ctr" style="font-size:11px">'+(oldest?oldest:'-')+'</td><td class="ctr">'+chk+'</td></tr>';
     });
     h+='</table></div>';
   } else {
@@ -429,6 +435,14 @@ function renderEntity(ent){
   var ov1=0;segOverKeys().forEach(function(k){ov1+=segT[k]||0});
   var ov3=0;segOver3Keys().forEach(function(k){ov3+=segT[k]||0});
   h+='<div class="scard"><div class="val">'+fmtU(entClose(ent))+'</div><div class="lbl">期末余额USD</div></div>';
+  // 10月变动卡(2026-11-09): Σ维度 delta_usd; 全null(无增量)显示'-'
+  var eDelta=0,eHasDelta=false;
+  ent.dims.forEach(function(x){if(x.delta_usd!=null){eDelta+=x.delta_usd;eHasDelta=true}});
+  if(eHasDelta){
+    h+='<div class="scard '+(eDelta>0.5?'hi':(eDelta<-0.5?'ok':''))+'"><div class="val">'+(eDelta>0?'+':'')+fmtU(eDelta)+'</div><div class="lbl">10月变动USD</div></div>';
+  }else{
+    h+='<div class="scard"><div class="val">-</div><div class="lbl">10月变动USD</div></div>';
+  }
   h+='<div class="scard hi"><div class="val">'+fmtU(ov1)+'</div><div class="lbl">1年以上USD</div></div>';
   h+='<div class="scard md"><div class="val">'+fmtU(ov3)+'</div><div class="lbl">3年以上USD</div></div>';
   h+='<div class="scard lo"><div class="val">'+fmtU(segT.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
@@ -453,7 +467,7 @@ function renderEntity(ent){
     if(!visDims.length && segTotal(s.buckets_usd||{})<=0)return;    h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
     h+='<div class="dhdr" onclick="toggleP(this)"><h3>'+sk+' '+esc(s.name)+'</h3><div><span class="badge '+(overRatio(s)>0.5?'hi':(overRatio(s)>0.2?'md':'lo'))+'">'+fmtU(subClose(s))+' USD</span></div></div>';
     h+='<div class="dbody">';
-    h+='<table class="rtable"><tr><th style="width:220px">往来对象</th><th style="width:100px">期末余额<br>USD</th>'+segTh(80)+'<th style="width:90px">最长挂账</th><th style="width:90px">最后交易</th><th style="width:80px">是否可催</th><th style="width:110px">备注</th></tr>';
+    h+='<table class="rtable"><tr><th style="width:210px">往来对象</th><th style="width:95px">期末余额<br>USD</th><th style="width:85px">10月变动<br>USD</th>'+segTh(75)+'<th style="width:85px">最长挂账</th><th style="width:85px">最后交易</th><th style="width:75px">是否可催</th><th style="width:105px">备注</th></tr>';
     // 隐藏余额为0的维度(2026-10-21): 期末余额(USD口径)为0/无余额的往来对象不显示,
     // 减少无效行; 有备注的保留(避免已填信息"消失")
     // 是否可催筛选(2026-11-02): YES=标记"是", NO=标记"否", NONE=未标记; 有可催标记的行始终保留
@@ -473,7 +487,15 @@ function renderEntity(ent){
       var nk=ent.entity+'-'+x.sub+'-'+x.name;
       var noteVal=NOTES[nk]||_drafts[nk]||'';  // 正式值优先, 草稿兜底(未保存的半截字)
       var cv=COLL[nk]||'';  // 是/否/''(未标记)
-      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
+      // 10月变动(2026-11-09): delta_usd=期末-上月末(带方向符号); null=无增量对比显示'-'
+      var dv=x.delta_usd;
+      var dCell;
+      if(dv==null){dCell='<td class="ctr" style="color:var(--tx2)">-</td>'}
+      else{
+        var dCol=dv>0.5?'var(--hi)':(dv<-0.5?'var(--ok)':'var(--tx2)');  // 涨红跌绿(中文口径)
+        dCell='<td class="num" style="color:'+dCol+'">'+(dv>0?'+':'')+fmtU(dv)+'</td>';
+      }
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+dCell+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
     });
     h+='</table>';
     h+='</div></div>';
