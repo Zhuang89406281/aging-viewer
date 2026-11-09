@@ -293,7 +293,7 @@ function render(){
   if(d.meta.coverage){h+=' &middot; <span style="color:var(--tx2)">覆盖度：主体 '+d.meta.coverage.n_entities+' &middot; 明细行 '+d.meta.coverage.n_entries.toLocaleString()+' &middot; 勾稽组 '+d.meta.coverage.n_check_groups+'</span>';}
   h+='</div>';
   if(_staleData){
-    h+='<div class="sec" style="border:1px solid var(--hi);border-radius:8px;padding:8px 12px;background:var(--hi-bg);font-size:12px"><b style="color:var(--hi)">&#9888; 云端数据拉取失败, 当前显示的是浏览器本地旧缓存(数据构建: '+esc(d.meta.built.slice(0,10))+')</b><div style="color:var(--tx2);margin-top:4px">失败原因: '+esc(_staleReason||'未知')+'(401=token失效, 网络错误=无法连接GitHub)</div><div style="color:var(--tx2);margin-top:4px">请重新打开含 token 的完整链接; 若持续出现请检查网络(需能访问 api.github.com)</div></div>';
+    h+='<div class="sec" style="border:1px solid var(--hi);border-radius:8px;padding:8px 12px;background:var(--hi-bg);font-size:12px"><b style="color:var(--hi)">&#9888; 云端数据拉取失败, 当前显示的是浏览器本地旧缓存(数据构建: '+esc(d.meta.built.slice(0,10))+')</b><div style="color:var(--tx2);margin-top:4px">失败原因: '+esc(_staleReason||'未知')+'(401=token失效, 网络错误=无法连接GitHub)</div><div style="color:var(--tx2);margin-top:4px;display:flex;align-items:center;gap:10px"><button onclick="hardReset()" style="padding:4px 14px;background:var(--hi);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">一键修复(清缓存重载)</button><span>修复后若仍失败, 请用含 token 的完整链接重新打开</span></div></div>';
   }
   if(d.meta.warnings&&d.meta.warnings.length){
     h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 输入体检告警 '+d.meta.warnings.length+' 条</b><div style="color:var(--tx2);margin-top:4px">'+d.meta.warnings.slice(0,20).map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
@@ -518,6 +518,15 @@ function toggleP(el){
     if(el.parentElement.classList.contains('open')){OPEN_PANELS[el.parentElement.id]=1}
     else{delete OPEN_PANELS[el.parentElement.id]}
   }
+}
+function hardReset(){
+  // 一键修复(2026-11-09): 清掉本看板存在 localStorage 的旧缓存数据与旧token,
+  // 强制重载。重载后无token会显示"无法加载数据"指引, 用户用完整链接打开即好。
+  try{
+    ['_agingCachedData','agingNotes','agingColl','agingDrafts','gh_token','pw_ok'].forEach(function(k){localStorage.removeItem(k)});
+  }catch(e){}
+  sessionStorage.removeItem('pw_ok');
+  location.reload();
 }
 function setEntity(v){ENTITY_FILTER=v||null;render()}
 function setSubject(v){SUBJECT_FILTER=v||'ALL';render()}
