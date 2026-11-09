@@ -81,8 +81,9 @@ var _pwBlocked=false;
 var GH_REPO='Zhuang89406281/aging-viewer';
 var GH_DATA_REPO='Zhuang89406281/aging-viewer-data';
 var GH_TOKEN=(function(){
-  var m=location.hash.match(/token=([a-zA-Z0-9_]+)/);
-  if(m){localStorage.setItem('gh_token',m[1]);history.replaceState(null,'',location.pathname+location.search);return m[1]}
+  // 2026-11-09: 同时支持 ?token= (查询参数,聊天软件不截断,推荐) 和 #token= (旧版兼容)
+  var m=location.search.match(/token=([a-zA-Z0-9_]+)/)||location.hash.match(/token=([a-zA-Z0-9_]+)/);
+  if(m){localStorage.setItem('gh_token',m[1]);history.replaceState(null,'',location.pathname);return m[1]}
   return localStorage.getItem('gh_token')||'';
 })();
 var GH_FILE='shared_data_v2.json';  // v2: 2026-10-21 迁移 — 旧版页面的 atob 乱码bug会反复污染
