@@ -73,7 +73,7 @@ body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;backgroun
 
 'use strict';
 var DATA=null, NOTES={}, COLL={}, ENTITY_FILTER=null, SUBJECT_FILTER='ALL', CUR_FILTER='USD';
-var _staleData=false;  // true=云端拉取失败正在用本地旧缓存(2026-11-09)
+var _staleData=false;var _staleReason='';  // 云端拉取失败原因(401=token失效/TypeError=网络不通)
 var COLL_FILTER='ALL';  // 是否可催筛选: ALL/YES/NO(2026-11-02)
 var _pwBlocked=false;
 
@@ -216,7 +216,7 @@ function loadDataFromGitHub(){
   })
   .catch(function(e){
     var cached=localStorage.getItem('_agingCachedData');
-    if(cached){try{DATA=JSON.parse(cached).data;_staleData=true;render();apiLoad()}catch(ex){showNoData()}}
+    if(cached){try{DATA=JSON.parse(cached).data;_staleData=true;_staleReason=String(e&&e.message||e);render();apiLoad()}catch(ex){showNoData()}}
     else{showNoData()}
   });
 }
@@ -293,7 +293,7 @@ function render(){
   if(d.meta.coverage){h+=' &middot; <span style="color:var(--tx2)">覆盖度：主体 '+d.meta.coverage.n_entities+' &middot; 明细行 '+d.meta.coverage.n_entries.toLocaleString()+' &middot; 勾稽组 '+d.meta.coverage.n_check_groups+'</span>';}
   h+='</div>';
   if(_staleData){
-    h+='<div class="sec" style="border:1px solid var(--hi);border-radius:8px;padding:8px 12px;background:var(--hi-bg);font-size:12px"><b style="color:var(--hi)">&#9888; 云端数据拉取失败, 当前显示的是浏览器本地旧缓存(数据构建: '+esc(d.meta.built.slice(0,10))+')</b><div style="color:var(--tx2);margin-top:4px">请检查网络后按 Ctrl+F5 强制刷新; 若持续出现请重新打开含 token 的完整链接</div></div>';
+    h+='<div class="sec" style="border:1px solid var(--hi);border-radius:8px;padding:8px 12px;background:var(--hi-bg);font-size:12px"><b style="color:var(--hi)">&#9888; 云端数据拉取失败, 当前显示的是浏览器本地旧缓存(数据构建: '+esc(d.meta.built.slice(0,10))+')</b><div style="color:var(--tx2);margin-top:4px">失败原因: '+esc(_staleReason||'未知')+'(401=token失效, 网络错误=无法连接GitHub)</div><div style="color:var(--tx2);margin-top:4px">请重新打开含 token 的完整链接; 若持续出现请检查网络(需能访问 api.github.com)</div></div>';
   }
   if(d.meta.warnings&&d.meta.warnings.length){
     h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 输入体检告警 '+d.meta.warnings.length+' 条</b><div style="color:var(--tx2);margin-top:4px">'+d.meta.warnings.slice(0,20).map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
