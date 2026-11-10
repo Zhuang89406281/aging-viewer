@@ -153,11 +153,53 @@ function apiSave(changes){
     return r.json();
   }).then(function(result){
     if(result&&result.content){GH_SHA=result.content.sha}
-    hideSaveErr();   // 保存成功 → 清除失败提示
+    // 2026-11-10 读回验证: PUT 成功后拉一次云端, 确认本次 changes 真的落盘
+    // (防 409 并发/半写状态假成功)。验证不过 = 当失败处理走重试。
+    fetch(url+'?ref=main',{headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'},cache:'no-store'})
+    .then(function(r){return r.json()}).then(function(f2){
+      if(!f2||!f2.content){throw new Error('verify: no content')}
+      var cd=b64ToJson(f2.content);
+      var ok=true;
+      for(var key in changes){if(changes.hasOwnProperty(key)&&typeof changes[key]==='object'){
+        for(var k in changes[key]){if(changes[key].hasOwnProperty(k)){
+          var expect=changes[key][k];
+          var actual=(cd[key]||{})[k];
+          if(expect===null){if(actual!==undefined&&actual!==null){ok=false}}
+          else if(String(actual)!==String(expect)){ok=false}
+        }}}
+      if(!ok){throw new Error('verify mismatch')}
+      GH_SHA=f2.sha;
+      hideSaveErr();
+      _saveRetry=0;
+    }}).catch(function(verr){console.warn('save verify failed',verr);showSaveErr()});
+    return;
   }).catch(function(err){
     console.error('apiSave error',err);
-    showSaveErr();   // 保存失败 → 显式提示(不再静默)
+    // 2026-11-10 自动重试: 失败自动重试最多3次(间隔5s), 仍失败才显示手动重试条。
+    // 之前一次失败就只弹提示, 用户不点"重试"数据就停在本地 — 现在自动兜底。
+    if(_saveRetry<3){
+      _saveRetry++;
+      showSaveToast('第'+_saveRetry+'次保存失败, 5秒后自动重试...');
+      setTimeout(function(){if(_lastFailedChanges)_apiSaveRaw(_lastFailedChanges)},5000);
+    }else{
+      showSaveErr();   // 3次重试仍失败 → 显式手动重试条
+    }
   });
+}
+var _saveRetry=0;
+// 轻量提示(自动重试中, 不挡操作)
+function showSaveToast(msg){
+  var t=document.getElementById('saveToast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='saveToast';
+    t.style.cssText='position:fixed;top:44px;right:16px;z-index:9999;background:#7c2d12;color:#fff;padding:8px 14px;font-size:12px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.display='block';
+  clearTimeout(t._h);
+  t._h=setTimeout(function(){t.style.display='none'},4500);
 }
 // === 保存失败提示条(多人并发场景防静默丢失) ===
 var _lastFailedChanges=null;  // 最近一次提交的 changes, 供重试
@@ -241,14 +283,26 @@ function showNoData(){
   document.getElementById('tokInput').focus();
 }
 function setNote(k,v){
-  if(v){NOTES[k]=v}else{delete NOTES[k]}
+  // 2026-11-10 防误删: 清空输入框 ≠ 删除备注! 空值直接忽略(保留原值),
+  // 删除必须走 delNote()(显式✕按钮+确认框)。之前"清空即删"导致 3 条备注被误删。
+  if(!v||!String(v).trim()){delete _drafts[k];if(_pendingRender){_pendingRender=false;render()}return}
+  NOTES[k]=v;
   localStorage.setItem('agingNotes',JSON.stringify(NOTES));
   delete _drafts[k];  // 已正式保存, 清掉草稿
-  // 增量保存(2026-11-02 修复): 之前传全量 NOTES, 删除备注后云端旧值仍在,
-  // 30s 轮询 Object.assign 会把已删备注"复活"。改为 {k:v} / {k:null}(null=删除)。
-  var ch={};ch[k]=v||null;
+  // 增量保存: {k:v} 增量; null=删除 仅 delNote 使用。
+  var ch={};ch[k]=v;
   apiSave({notes:ch});
   if(_pendingRender){_pendingRender=false;render()}  // 补上被推迟的渲染
+}
+// 显式删除备注(2026-11-10): 唯一会发 null 删除的入口, 带确认框
+function delNote(k){
+  if(!confirm('确定删除该备注? 此操作会从云端移除, 所有人可见。'))return;
+  delete NOTES[k];
+  localStorage.setItem('agingNotes',JSON.stringify(NOTES));
+  delete _drafts[k];
+  var ch={};ch[k]=null;
+  apiSave({notes:ch});
+  render();
 }
 // 是否可催(2026-11-02): 维度级催收标记, 与备注同机制云同步(shared_data_v2.json.collectable)
 function setColl(k,v){
@@ -529,7 +583,7 @@ function renderEntity(ent){
         var dCol=dv>0.5?'var(--hi)':(dv<-0.5?'var(--ok)':'var(--tx2)');  // 涨红跌绿(中文口径)
         dCell='<td class="num" style="color:'+dCol+'">'+(dv>0?'+':'')+fmtU(dv)+'</td>';
       }
-      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+dCell+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><select class="coll-sel" onchange="setBp(\''+esc(nk)+'\',this.value)"><option value=""'+(bpv===''?' selected':'')+'>-</option><option value="是"'+(bpv==='是'?' selected':'')+'>是</option><option value="否"'+(bpv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+dCell+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><select class="coll-sel" onchange="setBp(\''+esc(nk)+'\',this.value)"><option value=""'+(bpv===''?' selected':'')+'>-</option><option value="是"'+(bpv==='是'?' selected':'')+'>是</option><option value="否"'+(bpv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><div style="display:flex;gap:3px;align-items:center"><input type="text" class="note-input" style="flex:1;min-width:0" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)">'+(NOTES[nk]?'<button title="删除备注" onclick="delNote(\''+esc(nk)+'\')" style="padding:2px 6px;border:1px solid var(--bd);background:var(--sf);color:var(--hi);border-radius:3px;cursor:pointer;font-size:11px;flex:none">&#10005;</button>':'')+'</div></td></tr>';
     });
     h+='</table>';
     h+='</div></div>';
