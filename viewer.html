@@ -72,9 +72,10 @@ body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;backgroun
 <script>
 
 'use strict';
-var DATA=null, NOTES={}, COLL={}, ENTITY_FILTER=null, SUBJECT_FILTER='ALL', CUR_FILTER='USD';
+var DATA=null, NOTES={}, COLL={}, BP={}, ENTITY_FILTER=null, SUBJECT_FILTER='ALL', CUR_FILTER='USD';
 var _staleData=false;var _staleReason='';  // 云端拉取失败原因(401=token失效/TypeError=网络不通)
 var COLL_FILTER='ALL';  // 是否可催筛选: ALL/YES/NO(2026-11-02)
+var BP_FILTER='ALL';    // 是否需要BP介入筛选(2026-11-10)
 var _pwBlocked=false;
 
 // === GitHub API Layer ===
@@ -108,6 +109,7 @@ function apiLoad(){
     var d=b64ToJson(finfo.content);
     if(d.notes){Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))}
     if(d.collectable){Object.assign(COLL,d.collectable);try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}}
+    if(d.bp){Object.assign(BP,d.bp);try{localStorage.setItem('agingBp',JSON.stringify(BP))}catch(e){}}
     // 用户正在输入备注/选择可催状态时推迟重渲染(2026-10-26): render() 会销毁正在打字的输入框,
     // 半截未 onchange 的文字会丢。焦点在输入框/下拉 → 只更新数据, 失焦后再补一次渲染。
     var ae=document.activeElement;
@@ -177,7 +179,7 @@ function hideSaveErr(){var bar=document.getElementById('saveErrBar');if(bar)bar.
 var _apiSaveRaw=apiSave;
 apiSave=function(changes){_lastFailedChanges=changes;_apiSaveRaw(changes)};
 setInterval(function(){if(_ghAvailable)apiLoad()},30000);
-window.addEventListener('beforeunload',function(){localStorage.setItem('agingNotes',JSON.stringify(NOTES));try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}});
+window.addEventListener('beforeunload',function(){localStorage.setItem('agingNotes',JSON.stringify(NOTES));try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}try{localStorage.setItem('agingBp',JSON.stringify(BP))}catch(e){}});
 
 // === Password Gate ===
 // 密码由构建脚本(gen_viewer_html.py)从配置注入, 源码中不再硬编码明文
@@ -198,6 +200,7 @@ if(!PW_AUTHED){showPwGate();_pwBlocked=true}
 function init(){
   try{var n=localStorage.getItem('agingNotes');if(n)NOTES=JSON.parse(n)}catch(e){}
   try{var c=localStorage.getItem('agingColl');if(c)COLL=JSON.parse(c)}catch(e){}
+  try{var b=localStorage.getItem('agingBp');if(b)BP=JSON.parse(b)}catch(e){}
   if(GH_TOKEN){loadDataFromGitHub()}
   else{
     var cached=localStorage.getItem('_agingCachedData');
@@ -253,6 +256,14 @@ function setColl(k,v){
   try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}
   var ch={};ch[k]=v||null;
   apiSave({collectable:ch});
+  if(_pendingRender){_pendingRender=false;render()}
+}
+// 是否需要BP介入(2026-11-10): 维度级标记, 与可催同机制云同步(shared_data_v2.json.bp)
+function setBp(k,v){
+  if(v){BP[k]=v}else{delete BP[k]}
+  try{localStorage.setItem('agingBp',JSON.stringify(BP))}catch(e){}
+  var ch={};ch[k]=v||null;
+  apiSave({bp:ch});
   if(_pendingRender){_pendingRender=false;render()}
 }
 // 草稿保护: 每敲一个字存本地(2026-10-26)。即使发生重渲染/切筛选, 草稿在渲染时回填,
@@ -339,6 +350,12 @@ function render(){
   h+='<option value="YES"'+(COLL_FILTER==='YES'?' selected':'')+'>是</option>';
   h+='<option value="NO"'+(COLL_FILTER==='NO'?' selected':'')+'>否</option>';
   h+='<option value="NONE"'+(COLL_FILTER==='NONE'?' selected':'')+'>未标记</option>';
+  h+='</select>';
+  h+='<label>BP介入:</label><select class="fsel" id="bpSel" onchange="setBpF(this.value)">';
+  h+='<option value="ALL"'+(BP_FILTER==='ALL'?' selected':'')+'>全部</option>';
+  h+='<option value="YES"'+(BP_FILTER==='YES'?' selected':'')+'>是</option>';
+  h+='<option value="NO"'+(BP_FILTER==='NO'?' selected':'')+'>否</option>';
+  h+='<option value="NONE"'+(BP_FILTER==='NONE'?' selected':'')+'>未标记</option>';
   h+='</select>';
   h+='</div>';
   // 主体卡片
@@ -481,14 +498,16 @@ function renderEntity(ent){
     if(!visDims.length && segTotal(s.buckets_usd||{})<=0)return;    h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
     h+='<div class="dhdr" onclick="toggleP(this)"><h3>'+sk+' '+esc(s.name)+'</h3><div><span class="badge '+(overRatio(s)>0.5?'hi':(overRatio(s)>0.2?'md':'lo'))+'">'+fmtU(subClose(s))+' USD</span></div></div>';
     h+='<div class="dbody">';
-    h+='<table class="rtable"><tr><th style="width:210px">往来对象</th><th style="width:95px">期末余额<br>USD</th><th style="width:85px">10月变动<br>USD</th>'+segTh(75)+'<th style="width:85px">最长挂账</th><th style="width:85px">最后交易</th><th style="width:75px">是否可催</th><th style="width:105px">备注</th></tr>';
+    h+='<table class="rtable"><tr><th style="width:210px">往来对象</th><th style="width:95px">期末余额<br>USD</th><th style="width:85px">10月变动<br>USD</th>'+segTh(75)+'<th style="width:85px">最长挂账</th><th style="width:85px">最后交易</th><th style="width:70px">是否可催</th><th style="width:70px">BP介入</th><th style="width:100px">备注</th></tr>';
     // 隐藏余额为0的维度(2026-10-21): 期末余额(USD口径)为0/无余额的往来对象不显示,
     // 减少无效行; 有备注的保留(避免已填信息"消失")
     // 是否可催筛选(2026-11-02): YES=标记"是", NO=标记"否", NONE=未标记; 有可催标记的行始终保留
     var collKey=function(x){return ent.entity+'-'+x.sub+'-'+x.name};
     var collMatch=function(x){var cv=COLL[collKey(x)];if(COLL_FILTER==='YES')return cv==='是';if(COLL_FILTER==='NO')return cv==='否';if(COLL_FILTER==='NONE')return !cv;return true};
-    var dlAll=ent.dims.filter(function(x){return x.sub===sk && (Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5 || NOTES[ent.entity+'-'+x.sub+'-'+x.name] || COLL[collKey(x)])});
+    var bpMatch=function(x){var bv=BP[collKey(x)];if(BP_FILTER==='YES')return bv==='是';if(BP_FILTER==='NO')return bv==='否';if(BP_FILTER==='NONE')return !bv;return true};  // BP介入筛选(2026-11-10)
+    var dlAll=ent.dims.filter(function(x){return x.sub===sk && (Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5 || NOTES[ent.entity+'-'+x.sub+'-'+x.name] || COLL[collKey(x)] || BP[collKey(x)])});
     dlAll=dlAll.filter(collMatch);
+    dlAll=dlAll.filter(bpMatch);
     if(!dlAll.length)return;  // 该科目无可催筛选命中的行 → 隐藏面板
     dlAll.sort(function(a,b){return Math.abs(b.close_usd||b.total_usd||0)-Math.abs(a.close_usd||a.total_usd||0)});
     dlAll.forEach(function(x){
@@ -501,6 +520,7 @@ function renderEntity(ent){
       var nk=ent.entity+'-'+x.sub+'-'+x.name;
       var noteVal=NOTES[nk]||_drafts[nk]||'';  // 正式值优先, 草稿兜底(未保存的半截字)
       var cv=COLL[nk]||'';  // 是/否/''(未标记)
+      var bpv=BP[nk]||'';    // BP介入: 是/否/''(2026-11-10)
       // 10月变动(2026-11-09): delta_usd=期末-上月末(带方向符号); null=无增量对比显示'-'
       var dv=x.delta_usd;
       var dCell;
@@ -509,7 +529,7 @@ function renderEntity(ent){
         var dCol=dv>0.5?'var(--hi)':(dv<-0.5?'var(--ok)':'var(--tx2)');  // 涨红跌绿(中文口径)
         dCell='<td class="num" style="color:'+dCol+'">'+(dv>0?'+':'')+fmtU(dv)+'</td>';
       }
-      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+dCell+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+dCell+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><select class="coll-sel" onchange="setBp(\''+esc(nk)+'\',this.value)"><option value=""'+(bpv===''?' selected':'')+'>-</option><option value="是"'+(bpv==='是'?' selected':'')+'>是</option><option value="否"'+(bpv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><input type="text" class="note-input" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)"></td></tr>';
     });
     h+='</table>';
     h+='</div></div>';
@@ -568,6 +588,7 @@ function setEntity(v){ENTITY_FILTER=v||null;render()}
 function setSubject(v){SUBJECT_FILTER=v||'ALL';render()}
 function setCur(v){CUR_FILTER=v||'USD';render()}
 function setCollF(v){COLL_FILTER=v||'ALL';render()}
+function setBpF(v){BP_FILTER=v||'ALL';render()}
 if(!_pwBlocked)init();
 
 </script>
