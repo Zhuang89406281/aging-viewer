@@ -107,7 +107,16 @@ function apiLoad(){
     if(!finfo||!finfo.content)return;
     _ghAvailable=true;GH_SHA=finfo.sha;
     var d=b64ToJson(finfo.content);
-    if(d.notes){Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))}
+    if(d.notes){
+      // 2026-11-11 补漏同步: 本地有而云端没有/不同的备注(上次保存失败且重试期间关页等
+      // 场景遗留), 增量补传云端 — 保证"本地输入过的备注一定到云端"铁律。
+      var _backfill={};
+      for(var bk in NOTES){if(NOTES.hasOwnProperty(bk)){
+        if(d.notes[bk]===undefined||String(d.notes[bk])!==String(NOTES[bk])){_backfill[bk]=NOTES[bk]}
+      }}
+      if(Object.keys(_backfill).length){apiSave({notes:_backfill})}
+      Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))
+    }
     if(d.collectable){Object.assign(COLL,d.collectable);try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}}
     if(d.bp){Object.assign(BP,d.bp);try{localStorage.setItem('agingBp',JSON.stringify(BP))}catch(e){}}
     // 用户正在输入备注/选择可催状态时推迟重渲染(2026-10-26): render() 会销毁正在打字的输入框,
@@ -633,7 +642,8 @@ function hardReset(){
   // 一键修复(2026-11-09): 清掉本看板存在 localStorage 的旧缓存数据与旧token,
   // 强制重载。重载后无token会显示"无法加载数据"指引, 用户用完整链接打开即好。
   try{
-    ['_agingCachedData','agingNotes','agingColl','agingDrafts','gh_token','pw_ok'].forEach(function(k){localStorage.removeItem(k)});
+    // 2026-11-11: agingDrafts(草稿)不清 — 草稿只在本地, 清了就真丢; 其余缓存可清(云端有正本)
+    ['_agingCachedData','agingNotes','agingColl','gh_token','pw_ok'].forEach(function(k){localStorage.removeItem(k)});
   }catch(e){}
   sessionStorage.removeItem('pw_ok');
   location.reload();
