@@ -559,7 +559,7 @@ function renderEntity(ent){
     var collKey=function(x){return ent.entity+'-'+x.sub+'-'+x.name};
     var collMatch=function(x){var cv=COLL[collKey(x)];if(COLL_FILTER==='YES')return cv==='是';if(COLL_FILTER==='NO')return cv==='否';if(COLL_FILTER==='NONE')return !cv;return true};
     var bpMatch=function(x){var bv=BP[collKey(x)];if(BP_FILTER==='YES')return bv==='是';if(BP_FILTER==='NO')return bv==='否';if(BP_FILTER==='NONE')return !bv;return true};  // BP介入筛选(2026-11-10)
-    var dlAll=ent.dims.filter(function(x){return x.sub===sk && (Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5 || NOTES[ent.entity+'-'+x.sub+'-'+x.name] || COLL[collKey(x)] || BP[collKey(x)])});
+    var dlAll=ent.dims.filter(function(x){return x.sub===sk && Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5});  // 2026-11-11 用户确认: 期末余额=0 一律不展示(备注/标记数据云端保留, 维度再有余额时自动带出)
     dlAll=dlAll.filter(collMatch);
     dlAll=dlAll.filter(bpMatch);
     if(!dlAll.length)return;  // 该科目无可催筛选命中的行 → 隐藏面板
