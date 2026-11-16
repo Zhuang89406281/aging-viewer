@@ -8,7 +8,7 @@ for f in $(git diff --cached --name-only --diff-filter=ACM); do
     continue
   fi
   case "$f" in
-    *.json|*.xlsx|*.xls|*.csv|*.zip)
+    *.json|*.json.enc|*.enc|*.xlsx|*.xls|*.csv|*.zip)
       echo "✗ 拒绝提交数据文件: $f  (公开仓不得存放财务数据)"
       blocked=1
       continue
