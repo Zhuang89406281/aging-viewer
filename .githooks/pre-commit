@@ -1,0 +1,35 @@
+#!/bin/sh
+# 公开仓提交闸门(2026-11-16): 禁止把 token / 密码 / 财务数据提交进公开仓库。
+# 启用方式: git config core.hooksPath .githooks
+blocked=0
+
+for f in $(git diff --cached --name-only --diff-filter=ACM); do
+  if [ "${f#.githooks/}" != "$f" ]; then
+    continue
+  fi
+  case "$f" in
+    *.json|*.xlsx|*.xls|*.csv|*.zip)
+      echo "✗ 拒绝提交数据文件: $f  (公开仓不得存放财务数据)"
+      blocked=1
+      continue
+      ;;
+  esac
+  if git show ":$f" 2>/dev/null | grep -qE 'github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}'; then
+    echo "✗ 拒绝提交: $f 含 token 明文"
+    blocked=1
+  fi
+  if git show ":$f" 2>/dev/null | grep -qE '_a[[:space:]]*=[[:space:]]*"[A-Za-z0-9_]{20,}"'; then
+    echo "✗ 拒绝提交: $f 含拆半 token (_a=/_b= 拼接), 等价于 token 明文"
+    blocked=1
+  fi
+  if git show ":$f" 2>/dev/null | grep -qE 'atob\(.[A-Za-z0-9+/=]{10,}.'; then
+    echo "⚠  $f 含 base64 内联常量(以往是访问密码)。加密改造后密码不应再内联, 请确认"
+  fi
+done
+
+if [ "$blocked" -ne 0 ]; then
+  echo ""
+  echo "如果确有例外, 用 git commit --no-verify 强行跳过(不推荐, 会留痕)。"
+  exit 1
+fi
+exit 0

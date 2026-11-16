@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aging-viewer</title>
+<style>
+:root{--bg:#0f172a;--sf:#1e293b;--sf2:#334155;--bd:#475569;--tx:#f1f5f9;--tx2:#94a3b8;--p:#3b82f6;--hi:#ef4444;--hi-bg:#3b1111;--md:#f59e0b;--md-bg:#3b2f11;--lo:#3b82f6;--lo-bg:#1e3a5f;--ok:#22c55e;--ok-bg:#0f3320}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--tx);line-height:1.5}
+.app{max-width:1500px;margin:0 auto;padding:16px}
+.hdr{text-align:center;padding:16px 0 8px}
+.hdr h1{font-size:22px;font-weight:700}
+.hdr .sub{color:var(--tx2);font-size:13px;margin-top:2px}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0}
+.scard{padding:12px;border-radius:8px;text-align:center;border:1px solid var(--bd);background:var(--sf);cursor:default;transition:all .2s}
+.scard:hover{transform:translateY(-2px)}
+.scard .val{font-size:26px;font-weight:700}
+.scard .lbl{font-size:11px;color:var(--tx2)}
+.scard.hi .val{color:var(--hi)}.scard.md .val{color:var(--md)}.scard.lo .val{color:var(--lo)}.scard.ok .val{color:var(--ok)}
+.fbar{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center}
+.fbar label{font-size:12px;color:var(--tx2);margin-right:4px}
+.fsel{padding:6px 10px;border-radius:6px;background:var(--sf);border:1px solid var(--bd);color:var(--tx);font-size:12px}
+.fbtn{padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;background:var(--sf);border:1px solid var(--bd);color:var(--tx2);transition:all .2s}
+.fbtn:hover{background:var(--sf2)}.fbtn.act{background:var(--p);color:#fff;border-color:var(--p)}
+.rtable{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;table-layout:fixed}
+.rtable th{background:var(--sf2);color:var(--tx2);font-weight:600;text-align:center;padding:8px;border:1px solid var(--bd);position:sticky;top:0;z-index:1}
+.rtable td{padding:6px 8px;border:1px solid var(--bd);vertical-align:top;word-wrap:break-word}
+.rtable tr:hover td{background:var(--sf)}
+.rtable .num{text-align:right;font-variant-numeric:tabular-nums}
+.rtable .neg{color:var(--hi)}
+.rtable .ctr{text-align:center}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.badge.hi{background:var(--hi);color:#fff}.badge.md{background:var(--md);color:#000}.badge.lo{background:var(--lo);color:#fff}
+.sec{margin:16px 0}.sec-t{font-size:16px;font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
+.dpanel{background:var(--sf);border:1px solid var(--bd);border-radius:8px;margin:8px 0;overflow:hidden}
+.dhdr{padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.dhdr:hover{background:var(--sf2)}.dhdr h3{font-size:14px}
+.dbody{padding:0 14px 12px;display:none}
+.dpanel.open .dbody{display:block}
+.ap-tbl{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0;table-layout:fixed}
+.ap-tbl th{background:var(--sf2);color:var(--tx2);padding:4px 6px;border:1px solid var(--bd);text-align:center;font-size:11px}
+.ap-tbl td{padding:3px 6px;border:1px solid var(--bd);text-align:right;font-variant-numeric:tabular-nums;font-size:12px;word-wrap:break-word}
+.ap-tbl .lbl{text-align:left}
+.ap-tbl .warn{background:var(--hi-bg);color:var(--hi)}
+.ap-tbl .good{background:var(--ok-bg);color:var(--ok)}
+.entries{max-height:300px;overflow-y:auto;font-size:11px;margin:4px 0}
+.entries table{width:100%;border-collapse:collapse}
+.entries th{background:var(--sf2);color:var(--tx2);padding:3px 5px;border:1px solid var(--bd);text-align:center;position:sticky;top:0;font-size:10px}
+.entries td{padding:2px 5px;border:1px solid var(--bd);font-size:11px}
+.entries .num{text-align:right;font-variant-numeric:tabular-nums}
+.ebar{display:flex;gap:8px;justify-content:flex-end;margin:8px 0}
+.ebar button{padding:6px 14px;border-radius:6px;background:var(--p);color:#fff;border:none;cursor:pointer;font-size:12px}
+.ebar button:hover{opacity:.9}
+.agebar{display:flex;height:16px;border-radius:4px;overflow:hidden;margin:2px 0}
+.agebar div{min-width:0}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--tx2);margin:4px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+.note-input{width:100%;background:transparent;border:1px solid var(--bd);border-radius:3px;padding:2px 4px;color:var(--tx);font-size:11px;text-align:center}
+.note-input:focus{border-color:var(--p);outline:none}
+.coll-sel{width:100%;background:var(--sf);border:1px solid var(--bd);border-radius:3px;padding:2px 2px;color:var(--tx);font-size:11px;text-align:center;cursor:pointer}
+.coll-sel:focus{border-color:var(--p);outline:none}
+.coll-sel option{background:var(--sf);color:var(--tx)}
+.sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px}
+.sync-dot.on{background:var(--ok)}.sync-dot.off{background:var(--md)}
+.chk-ok{color:var(--ok);font-size:11px}.chk-bad{color:var(--hi);font-size:11px}
+@media(max-width:768px){.summary-grid{grid-template-columns:repeat(2,1fr)}.rtable{font-size:11px}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+
+'use strict';
+var DATA=null, NOTES={}, COLL={}, BP={}, ENTITY_FILTER=null, SUBJECT_FILTER='ALL', CUR_FILTER='USD';
+var _staleData=false;var _staleReason='';  // 云端拉取失败原因(401=token失效/TypeError=网络不通)
+var COLL_FILTER='ALL';  // 是否可催筛选: ALL/YES/NO(2026-11-02)
+var BP_FILTER='ALL';    // 是否需要BP介入筛选(2026-11-10)
+var _pwBlocked=false;
+
+// === GitHub API Layer ===
+var GH_REPO='Zhuang89406281/aging-viewer';
+var GH_DATA_REPO='Zhuang89406281/aging-viewer-data';
+var GH_TOKEN=(function(){
+  // 2026-11-09: 同时支持 ?token= (查询参数,聊天软件不截断,推荐) 和 #token= (旧版兼容)
+  var m=location.search.match(/token=([a-zA-Z0-9_]+)/)||location.hash.match(/token=([a-zA-Z0-9_]+)/);
+  if(m){localStorage.setItem('gh_token',m[1]);history.replaceState(null,'',location.pathname);return m[1]}
+  return localStorage.getItem('gh_token')||'';
+})();
+var GH_FILE='shared_data_v2.json';  // v2: 2026-10-21 迁移 — 旧版页面的 atob 乱码bug会反复污染
+// shared_data.json, 换文件名让旧代码(缓存/未关标签页)永远碰不到新数据
+var GH_SHA='';
+var _ghAvailable=false;
+
+// base64 → UTF-8 JSON: atob 返回 Latin-1 字节串, 中文必须经 TextDecoder 还原,
+// 直接 JSON.parse(atob(...)) 会乱码(2026-10-20 修复)
+function b64ToJson(b64){
+  var bin=atob(b64);
+  var bytes=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++){bytes[i]=bin.charCodeAt(i)}
+  return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+}
+function apiLoad(){
+  fetch('https://api.github.com/repos/'+GH_DATA_REPO+'/contents/'+GH_FILE,{
+    headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'},cache:'no-store'
+  }).then(function(r){if(!r.ok){_ghAvailable=false;return null}return r.json()}).then(function(finfo){
+    if(!finfo||!finfo.content)return;
+    _ghAvailable=true;GH_SHA=finfo.sha;
+    var d=b64ToJson(finfo.content);
+    if(d.notes){
+      // 2026-11-11 补漏同步: 本地有而云端没有/不同的备注(上次保存失败且重试期间关页等
+      // 场景遗留), 增量补传云端 — 保证"本地输入过的备注一定到云端"铁律。
+      var _backfill={};
+      for(var bk in NOTES){if(NOTES.hasOwnProperty(bk)){
+        if(d.notes[bk]===undefined||String(d.notes[bk])!==String(NOTES[bk])){_backfill[bk]=NOTES[bk]}
+      }}
+      if(Object.keys(_backfill).length){apiSave({notes:_backfill})}
+      Object.assign(NOTES,d.notes);localStorage.setItem('agingNotes',JSON.stringify(NOTES))
+    }
+    if(d.collectable){Object.assign(COLL,d.collectable);try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}}
+    if(d.bp){Object.assign(BP,d.bp);try{localStorage.setItem('agingBp',JSON.stringify(BP))}catch(e){}}
+    // 用户正在输入备注/选择可催状态时推迟重渲染(2026-10-26): render() 会销毁正在打字的输入框,
+    // 半截未 onchange 的文字会丢。焦点在输入框/下拉 → 只更新数据, 失焦后再补一次渲染。
+    var ae=document.activeElement;
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT')&&((ae.className||'').indexOf('note-input')>=0||(ae.className||'').indexOf('coll-sel')>=0)){
+      _pendingRender=true;
+      return;
+    }
+    render();
+  }).catch(function(){_ghAvailable=false});
+}
+var _pendingRender=false;
+function apiSave(changes){
+  if(!_ghAvailable&&!GH_SHA)return;
+  var url='https://api.github.com/repos/'+GH_DATA_REPO+'/contents/'+GH_FILE;
+  fetch(url,{headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'}}).then(function(r){return r.json()}).then(function(finfo){
+    if(!finfo||!finfo.content)return;
+    GH_SHA=finfo.sha;
+    var cloudData=b64ToJson(finfo.content);
+    // mojibake 防回流闸(2026-10-26): 历史乱码可能存在某些浏览器 localStorage 里,
+    // 随全量 NOTES 合并上传会重新污染云端。保存时过滤: 含 Ã/Â 的条目不上传,
+    // 且若云端已有该乱码 key 顺带清除(用保存触发自愈)。
+    for(var key in changes){if(changes.hasOwnProperty(key)&&typeof changes[key]==='object'){
+      if(!cloudData[key])cloudData[key]={};
+      for(var k in changes[key]){if(changes[key].hasOwnProperty(k)){
+        var kv=String(k),vv=changes[key][k];
+        if(vv!==null&&(String(vv).indexOf('Ã')>=0||String(vv).indexOf('Â')>=0||kv.indexOf('Ã')>=0||kv.indexOf('Â')>=0)){
+          delete cloudData[key][k];  // 云端同 key 的乱码变体一并清除
+          continue;
+        }
+        if(changes[key][k]===null){delete cloudData[key][k]}else{cloudData[key][k]=changes[key][k]}
+      }}
+      // 云端已存在的乱码 key(本地没这个 key 才会遗留)也清掉
+      for(var ck in cloudData[key]){if(cloudData[key].hasOwnProperty(ck)&&(ck.indexOf('Ã')>=0||ck.indexOf('Â')>=0)){delete cloudData[key][ck]}}
+    }}
+    cloudData.lastModified=new Date().toISOString();
+    var payload={message:'update aging notes',content:btoa(unescape(encodeURIComponent(JSON.stringify(cloudData)))),sha:GH_SHA};
+    return fetch(url,{method:'PUT',headers:{'Authorization':'token '+GH_TOKEN,'Content-Type':'application/json','User-Agent':'hermes'},body:JSON.stringify(payload)});
+  }).then(function(r){
+    if(!r)return;
+    if(!r.ok){throw new Error('PUT '+r.status)}
+    return r.json();
+  }).then(function(result){
+    if(result&&result.content){GH_SHA=result.content.sha}
+    // 2026-11-10 读回验证: PUT 成功后拉一次云端, 确认本次 changes 真的落盘
+    // (防 409 并发/半写状态假成功)。验证不过 = 当失败处理走重试。
+    fetch(url+'?ref=main',{headers:{'Authorization':'token '+GH_TOKEN,'User-Agent':'hermes'},cache:'no-store'})
+    .then(function(r){return r.json()}).then(function(f2){
+      if(!f2||!f2.content){throw new Error('verify: no content')}
+      var cd=b64ToJson(f2.content);
+      var ok=true;
+      for(var key in changes){if(changes.hasOwnProperty(key)&&typeof changes[key]==='object'){
+        for(var k in changes[key]){if(changes[key].hasOwnProperty(k)){
+          var expect=changes[key][k];
+          var actual=(cd[key]||{})[k];
+          if(expect===null){if(actual!==undefined&&actual!==null){ok=false}}
+          else if(String(actual)!==String(expect)){ok=false}
+        }}}
+      if(!ok){throw new Error('verify mismatch')}
+      GH_SHA=f2.sha;
+      hideSaveErr();
+      _saveRetry=0;
+    }}).catch(function(verr){console.warn('save verify failed',verr);showSaveErr()});
+    return;
+  }).catch(function(err){
+    console.error('apiSave error',err);
+    // 2026-11-10 自动重试: 失败自动重试最多3次(间隔5s), 仍失败才显示手动重试条。
+    // 之前一次失败就只弹提示, 用户不点"重试"数据就停在本地 — 现在自动兜底。
+    if(_saveRetry<3){
+      _saveRetry++;
+      showSaveToast('第'+_saveRetry+'次保存失败, 5秒后自动重试...');
+      setTimeout(function(){if(_lastFailedChanges)_apiSaveRaw(_lastFailedChanges)},5000);
+    }else{
+      showSaveErr();   // 3次重试仍失败 → 显式手动重试条
+    }
+  });
+}
+var _saveRetry=0;
+// 轻量提示(自动重试中, 不挡操作)
+function showSaveToast(msg){
+  var t=document.getElementById('saveToast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='saveToast';
+    t.style.cssText='position:fixed;top:44px;right:16px;z-index:9999;background:#7c2d12;color:#fff;padding:8px 14px;font-size:12px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.display='block';
+  clearTimeout(t._h);
+  t._h=setTimeout(function(){t.style.display='none'},4500);
+}
+// === 保存失败提示条(多人并发场景防静默丢失) ===
+var _lastFailedChanges=null;  // 最近一次提交的 changes, 供重试
+function showSaveErr(){
+  var bar=document.getElementById('saveErrBar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='saveErrBar';
+    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    bar.innerHTML='&#9888; 备注保存失败(可能与他人并发编辑冲突),云端未更新 <button id="saveRetryBtn" style="padding:3px 14px;border:1px solid #fff;background:transparent;color:#fff;border-radius:4px;cursor:pointer;font-size:12px">重试保存</button><button id="saveDismissBtn" style="padding:3px 14px;border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;border-radius:4px;cursor:pointer;font-size:12px">忽略</button>';
+    document.body.appendChild(bar);
+    document.getElementById('saveRetryBtn').onclick=function(){hideSaveErr();if(_lastFailedChanges)apiSave(_lastFailedChanges)};
+    document.getElementById('saveDismissBtn').onclick=function(){hideSaveErr()};
+  }
+  bar.style.display='flex';
+}
+function hideSaveErr(){var bar=document.getElementById('saveErrBar');if(bar)bar.style.display='none'}
+// 包一层: 记录最近一次提交的 changes, 失败后可重试
+var _apiSaveRaw=apiSave;
+apiSave=function(changes){_lastFailedChanges=changes;_apiSaveRaw(changes)};
+setInterval(function(){if(_ghAvailable)apiLoad()},30000);
+window.addEventListener('beforeunload',function(){localStorage.setItem('agingNotes',JSON.stringify(NOTES));try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}try{localStorage.setItem('agingBp',JSON.stringify(BP))}catch(e){}});
+
+// === 密码门禁 + 数据解密 (2026-11-16 加密改造) ===
+// 以前密码以 atob 内联在页面里, 看一眼源码就知道, 那只是门闩不是锁。
+// 现在: 密码不落在页面上, 只用于派生 AES-GCM 密钥 —— 解密成功 ⇔ 密码正确。
+// 远端 viewer_data.json 存的是密文, 即使 token 泄露, 拿到的也只是乱码。
+var _pwBlocked=false;
+var PBKDF2_ITER=310000;
+function _b64u(s){var bin=atob(s),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
+function _deriveKey(pw,salt,iter){
+  return crypto.subtle.importKey('raw',new TextEncoder().encode(pw),{name:'PBKDF2'},false,['deriveKey'])
+    .then(function(base){return crypto.subtle.deriveKey(
+      {name:'PBKDF2',salt:_b64u(salt),iterations:iter||PBKDF2_ITER,hash:'SHA-256'},
+      base,{name:'AES-GCM',length:256},false,['decrypt'])});
+}
+function decryptEnvelope(env,pw){
+  var iv=_b64u(env.iv),ct=_b64u(env.ct);
+  return _deriveKey(pw,env.salt,env.iter).then(function(k){
+    return crypto.subtle.decrypt({name:'AES-GCM',iv:iv},k,ct);
+  }).then(function(buf){return JSON.parse(new TextDecoder().decode(buf))});
+}
+function showPwGate(errMsg){
+  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117"><div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px;text-align:center;max-width:400px"><div style="font-size:48px;margin-bottom:16px">&#128274;</div><div style="color:#e6edf3;font-size:20px;font-weight:600;margin-bottom:8px">Aging-viewer</div><div style="color:#8b949e;font-size:14px;margin-bottom:24px">&#35831;&#36755;&#20837;&#35775;&#38382;&#23494;&#30721;</div><input id="pwInput" type="password" placeholder="&#23494;&#30721;" style="width:100%;padding:12px 16px;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#e6edf3;font-size:16px;outline:none;box-sizing:border-box"><div id="pwErr" style="color:#f85149;font-size:13px;margin-top:8px;'+(errMsg?'':'display:none')+'">'+(errMsg||'&#23494;&#30721;&#38169;&#35823;&#65292;&#35831;&#37325;&#35797;')+'</div><button id="pwBtn" style="width:100%;margin-top:16px;padding:12px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:600">&#36827;&#20837;</button><div style="color:#484f58;font-size:11px;margin-top:14px">数据为密文存储，密码仅在本机用于解密，不上传</div></div></div>';
+  document.getElementById('pwInput').focus();
+  document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('pwBtn').click()});
+  document.getElementById('pwBtn').addEventListener('click',function(){
+    var v=document.getElementById('pwInput').value;
+    if(!v){return}
+    sessionStorage.setItem('pw',v);
+    document.body.innerHTML='<div style="padding:40px;color:#0f0;font-size:24px;background:#0d1117;height:100vh">正在解密数据...</div>';
+    setTimeout(function(){location.reload()},80);
+  });
+}
+var PW_AUTHED=!!sessionStorage.getItem('pw');
+if(!PW_AUTHED){showPwGate();_pwBlocked=true}
+function showMigrating(){
+  var el=document.getElementById('app');
+  if(el)el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#58a6ff;font-size:16px;text-align:center"><div>数据正在切换为加密存储，约需 1 分钟。<br>请稍后刷新本页。</div></div>';
+}
+
+function init(){
+  try{var n=localStorage.getItem('agingNotes');if(n)NOTES=JSON.parse(n)}catch(e){}
+  try{var c=localStorage.getItem('agingColl');if(c)COLL=JSON.parse(c)}catch(e){}
+  try{var b=localStorage.getItem('agingBp');if(b)BP=JSON.parse(b)}catch(e){}
+  if(GH_TOKEN){loadDataFromGitHub()}
+  else{showNoData()}
+}
+function finishLoad(plain){
+  DATA=plain;
+  try{localStorage.setItem('_agingCachedData',JSON.stringify({data:DATA}))}catch(e){}
+  render();apiLoad();
+}
+function loadDataFromGitHub(){
+  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;color:#58a6ff;font-size:18px">&#8987; &#27491;&#22312;&#21152;&#36733;&#36134;&#40836;&#25968;&#25454;...</div>';
+  var hdrs={'Authorization':'token '+GH_TOKEN,'Accept':'application/vnd.github.raw+json'};
+  fetch('https://api.github.com/repos/'+GH_DATA_REPO+'/contents/viewer_data.json?ref=main',{headers:hdrs,cache:'no-store'})
+  .then(function(r){if(!r.ok)throw new Error('data '+r.status);return r.json()})
+  .then(function(d){
+    if(d&&d.v===1&&d.ct){
+      var pw=sessionStorage.getItem('pw');
+      if(!pw){showPwGate();_pwBlocked=true;return}
+      return decryptEnvelope(d,pw).then(function(plain){
+        finishLoad(plain);
+      }).catch(function(){
+        sessionStorage.removeItem('pw');
+        showPwGate('密码不正确，请重新输入');
+        _pwBlocked=true;
+      });
+    }
+    if(d&&d.migrating){showMigrating();return}
+    showMigrating();
+  })
+  .catch(function(e){
+    if(_pwBlocked)return;
+    var cached=localStorage.getItem('_agingCachedData');
+    if(cached&&sessionStorage.getItem('pw')){
+      try{DATA=JSON.parse(cached).data;_staleData=true;_staleReason=String(e&&e.message||e);render();apiLoad();return}catch(ex){}
+    }
+    showNoData();
+  });
+}
+function showNoData(){
+  // 2026-11-09 终极保底: 手动粘贴 token 恢复入口(链接被聊天软件截断时用)
+  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0d1117;text-align:center"><div style="max-width:520px"><div style="color:#f85149;font-size:18px">&#9888; &#26080;&#27861;&#21152;&#36733;&#25968;&#25454;</div><div style="color:#8b949e;font-size:13px;margin:10px 0 18px">&#38142;&#25509;&#21487;&#33021;&#34987;&#32842;&#22825;&#36719;&#20214;&#25130;&#26029;&#25171;&#19981;&#20840;&#12290;&#25226;&#23436;&#25972;token&#31896;&#36148;&#21040;&#19979;&#38754;&#36755;&#20837;&#26694;&#65292;&#28857;&#12300;&#30830;&#35748;&#24182;&#37325;&#26032;&#21152;&#36733;&#12301;&#65306;</div><input id="tokInput" type="text" placeholder="github_pat_..." style="width:100%;padding:10px 14px;border:1px solid #30363d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:13px;outline:none;box-sizing:border-box"><button id="tokBtn" style="width:100%;margin-top:12px;padding:10px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">&#30830;&#35748;&#24182;&#37325;&#26032;&#21152;&#36733;</button><div id="tokErr" style="color:#f85149;font-size:12px;margin-top:8px;display:none">token&#30475;&#36215;&#26469;&#19981;&#23545;&#65292;&#24212;&#20197; github_pat_ &#25110; gho_ &#24320;&#22836;</div></div></div>';
+  var btn=document.getElementById('tokBtn');
+  btn.onclick=function(){
+    var v=document.getElementById('tokInput').value.trim();
+    if(!/^(github_pat_|gho_|ghp_)[A-Za-z0-9_]+$/.test(v)){
+      document.getElementById('tokErr').style.display='block';return;
+    }
+    localStorage.setItem('gh_token',v);
+    location.href=location.pathname;  // 清掉可能残缺的查询串
+    location.reload();
+  };
+  document.getElementById('tokInput').addEventListener('keydown',function(e){if(e.key==='Enter')btn.click()});
+  document.getElementById('tokInput').focus();
+}
+function setNote(k,v){
+  // 2026-11-10 防误删: 清空输入框 ≠ 删除备注! 空值直接忽略(保留原值),
+  // 删除必须走 delNote()(显式✕按钮+确认框)。之前"清空即删"导致 3 条备注被误删。
+  if(!v||!String(v).trim()){delete _drafts[k];if(_pendingRender){_pendingRender=false;render()}return}
+  NOTES[k]=v;
+  localStorage.setItem('agingNotes',JSON.stringify(NOTES));
+  delete _drafts[k];  // 已正式保存, 清掉草稿
+  // 增量保存: {k:v} 增量; null=删除 仅 delNote 使用。
+  var ch={};ch[k]=v;
+  apiSave({notes:ch});
+  if(_pendingRender){_pendingRender=false;render()}  // 补上被推迟的渲染
+}
+// 显式删除备注(2026-11-10): 唯一会发 null 删除的入口, 带确认框
+function delNote(k){
+  if(!confirm('确定删除该备注? 此操作会从云端移除, 所有人可见。'))return;
+  delete NOTES[k];
+  localStorage.setItem('agingNotes',JSON.stringify(NOTES));
+  delete _drafts[k];
+  var ch={};ch[k]=null;
+  apiSave({notes:ch});
+  render();
+}
+// 是否可催(2026-11-02): 维度级催收标记, 与备注同机制云同步(shared_data_v2.json.collectable)
+function setColl(k,v){
+  if(v){COLL[k]=v}else{delete COLL[k]}
+  try{localStorage.setItem('agingColl',JSON.stringify(COLL))}catch(e){}
+  var ch={};ch[k]=v||null;
+  apiSave({collectable:ch});
+  if(_pendingRender){_pendingRender=false;render()}
+}
+// 是否需要BP介入(2026-11-10): 维度级标记, 与可催同机制云同步(shared_data_v2.json.bp)
+function setBp(k,v){
+  if(v){BP[k]=v}else{delete BP[k]}
+  try{localStorage.setItem('agingBp',JSON.stringify(BP))}catch(e){}
+  var ch={};ch[k]=v||null;
+  apiSave({bp:ch});
+  if(_pendingRender){_pendingRender=false;render()}
+}
+// 草稿保护: 每敲一个字存本地(2026-10-26)。即使发生重渲染/切筛选, 草稿在渲染时回填,
+// 不再"打到一半消失"。正式保存(onchange)后清除。
+var _drafts={};
+try{_drafts=JSON.parse(localStorage.getItem('agingDrafts')||'{}')}catch(e){_drafts={}}
+function saveDraft(k,v){
+  if(v){_drafts[k]=v}else{delete _drafts[k]}
+  try{localStorage.setItem('agingDrafts',JSON.stringify(_drafts))}catch(e){}
+}
+
+// === 工具 ===
+// 分档由数据 meta.segs 驱动(口径可切), 末尾固定追加 open_legacy(期初遗留)
+var SEGS=[['m3','3月内','var(--ok)'],['m6','3-6月','var(--md)'],['m12','6-12月','var(--lo)'],['y2','1-2年','var(--hi)'],['y3','2-3年','#a855f7'],['y3p','3年以上','#7f1d1d'],['open_legacy','期初遗留','var(--tx2)']];
+function segInit(){ if(DATA&&DATA.meta&&DATA.meta.segs){ SEGS=DATA.meta.segs.map(function(s){return [s.key,s.name,s.color]}); SEGS.push(['open_legacy','期初遗留','var(--tx2)']); } }
+function segKeys(){ return SEGS.map(function(s){return s[0]}); }
+// "1年以上"口径的段: 由 meta.segs 的 over 标记 + open_legacy 组成
+function segOverKeys(){
+  if(DATA&&DATA.meta&&DATA.meta.segs){ var ks=DATA.meta.segs.filter(function(s){return s.over}).map(function(s){return s.key}); ks.push('open_legacy'); return ks; }
+  return ['y2','y3','y3p','open_legacy'];
+}
+// "3年以上"口径的段: 最后一段(除 open_legacy) + open_legacy
+function segOver3Keys(){
+  if(DATA&&DATA.meta&&DATA.meta.segs&&DATA.meta.segs.length){ var ks=[DATA.meta.segs[DATA.meta.segs.length-1].key]; ks.push('open_legacy'); return ks; }
+  return ['y3p','open_legacy'];
+}
+
+var CCYN={USD:'USD',NGN:'NGN(奈拉)',CNY:'CNY(人民币)',KES:'KES(先令)',TZS:'TZS(先令)',XOF:'XOF(西非法郎)',XAF:'XAF(中非法郎)',HKD:'HKD',GBP:'GBP',EUR:'EUR',GHS:'GHS(塞地)',PKR:'PKR',UGX:'UGX',RWF:'RWF',BASE:'本位币'};
+function fmt(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e4)return(n/1e3).toFixed(1)+'K';return a<1&&a>0?'0.01':Math.round(a).toLocaleString()}
+function fmtU(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return a<1?'0':Math.round(a).toLocaleString()}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function dimLabel(nm){var m=String(nm||'').match(/^[A-Z0-9]+[-_]?(.*)$/);return nm}
+function isInternal(nm){return /^[0-9]{3}[-_]/.test(String(nm||''))}
+
+// === 主渲染 ===
+function render(){
+  if(!DATA)return;
+  segInit();
+  snapshotOpenPanels();  // 渲染前记录展开状态(轮询重渲染不丢)
+  var d=DATA;
+  var h='';
+  h+='<div class="hdr"><h1>往来账龄分析看板</h1><div class="sub">1123 预付账款 / 1221 其他应收款 &middot; 逐笔FIFO &middot; 截止各主体最新账月 &middot; 数据构建: '+esc(d.meta.built.slice(0,10))+' &middot; 汇率月份: '+esc(d.meta.fx_month)+' <span class="sync-dot '+( _ghAvailable?'on':'off')+'" id="syncDot"></span></div></div>';
+  // 基准日 / 覆盖度 / 告警条
+  h+='<div class="sub" style="text-align:center;font-size:12px;margin-top:-4px">';
+  if(d.meta.base_date_min){
+    if(d.meta.base_date_mixed){
+      h+='<span style="color:var(--md)">&#9888; 各主体基准日不一致：'+esc(d.meta.base_date_min)+' ~ '+esc(d.meta.base_date_max)+'（全集团汇总为各主体各自最新账月末加总，非同一时点，仅供参考）</span>';
+    }else{
+      h+='<span style="color:var(--tx2)">全集团统一基准日：'+esc(d.meta.base_date_min)+'</span>';
+    }
+  }
+  if(d.meta.coverage){h+=' &middot; <span style="color:var(--tx2)">覆盖度：主体 '+d.meta.coverage.n_entities+' &middot; 明细行 '+d.meta.coverage.n_entries.toLocaleString()+' &middot; 勾稽组 '+d.meta.coverage.n_check_groups+'</span>';}
+  h+='</div>';
+  if(_staleData){
+    h+='<div class="sec" style="border:1px solid var(--hi);border-radius:8px;padding:8px 12px;background:var(--hi-bg);font-size:12px"><b style="color:var(--hi)">&#9888; 云端数据拉取失败, 当前显示的是浏览器本地旧缓存(数据构建: '+esc(d.meta.built.slice(0,10))+')</b><div style="color:var(--tx2);margin-top:4px">失败原因: '+esc(_staleReason||'未知')+'(401=token失效, 网络错误=无法连接GitHub)</div><div style="color:var(--tx2);margin-top:4px;display:flex;align-items:center;gap:10px"><button onclick="hardReset()" style="padding:4px 14px;background:var(--hi);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">一键修复(清缓存重载)</button><span>修复后若仍失败, 请用含 token 的完整链接重新打开</span></div></div>';
+  }
+  if(d.meta.warnings&&d.meta.warnings.length){
+    h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 输入体检告警 '+d.meta.warnings.length+' 条</b><div style="color:var(--tx2);margin-top:4px">'+d.meta.warnings.slice(0,20).map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
+  }
+  // 筛选区
+  h+='<div class="fbar">';
+  h+='<label>主体:</label><select class="fsel" id="entSel" onchange="setEntity(this.value)">';
+  h+='<option value="">全部主体汇总</option>';
+  d.entities.forEach(function(e){h+='<option value="'+e.entity+'"'+(ENTITY_FILTER===e.entity?' selected':'')+'>'+e.entity+' '+esc(e.name.slice(0,26))+'</option>'});
+  h+='</select>';
+  h+='<label>科目:</label><select class="fsel" id="subSel" onchange="setSubject(this.value)">';
+  h+='<option value="ALL"'+(SUBJECT_FILTER==='ALL'?' selected':'')+'>1123+1221</option>';
+  h+='<option value="1123"'+(SUBJECT_FILTER==='1123'?' selected':'')+'>1123 预付账款</option>';
+  h+='<option value="1221"'+(SUBJECT_FILTER==='1221'?' selected':'')+'>1221 其他应收款</option>';
+  h+='<option value="1123.01"'+(SUBJECT_FILTER==='1123.01'?' selected':'')+'>1123.01 预付账款-供应商</option>';
+  h+='<option value="1123.99"'+(SUBJECT_FILTER==='1123.99'?' selected':'')+'>1123.99 预付账款-其他</option>';
+  h+='<option value="1221.01"'+(SUBJECT_FILTER==='1221.01'?' selected':'')+'>1221.01 其他应收款-客户</option>';
+  h+='<option value="1221.02"'+(SUBJECT_FILTER==='1221.02'?' selected':'')+'>1221.02 其他应收款-员工</option>';
+  h+='<option value="1221.03"'+(SUBJECT_FILTER==='1221.03'?' selected':'')+'>1221.03 押金及保证金</option>';
+  h+='<option value="1221.04"'+(SUBJECT_FILTER==='1221.04'?' selected':'')+'>1221.04 五险一金及个税</option>';
+  h+='<option value="1221.99"'+(SUBJECT_FILTER==='1221.99'?' selected':'')+'>1221.99 内部往来</option>';
+  h+='</select>';
+  h+='<label>币别:</label><select class="fsel" id="curSel" onchange="setCur(this.value)">';
+  h+='<option value="USD"'+(CUR_FILTER==='USD'?' selected':'')+'>USD 汇总</option>';
+  h+='<option value="LOCAL"'+(CUR_FILTER==='LOCAL'?' selected':'')+'>本位币</option>';
+  h+='</select>';
+  h+='<label>是否可催:</label><select class="fsel" id="collSel" onchange="setCollF(this.value)">';
+  h+='<option value="ALL"'+(COLL_FILTER==='ALL'?' selected':'')+'>全部</option>';
+  h+='<option value="YES"'+(COLL_FILTER==='YES'?' selected':'')+'>是</option>';
+  h+='<option value="NO"'+(COLL_FILTER==='NO'?' selected':'')+'>否</option>';
+  h+='<option value="NONE"'+(COLL_FILTER==='NONE'?' selected':'')+'>未标记</option>';
+  h+='</select>';
+  h+='<label>BP介入:</label><select class="fsel" id="bpSel" onchange="setBpF(this.value)">';
+  h+='<option value="ALL"'+(BP_FILTER==='ALL'?' selected':'')+'>全部</option>';
+  h+='<option value="YES"'+(BP_FILTER==='YES'?' selected':'')+'>是</option>';
+  h+='<option value="NO"'+(BP_FILTER==='NO'?' selected':'')+'>否</option>';
+  h+='<option value="NONE"'+(BP_FILTER==='NONE'?' selected':'')+'>未标记</option>';
+  h+='</select>';
+  h+='</div>';
+  // 主体卡片
+  if(!ENTITY_FILTER){
+  h+='<div class="summary-grid">';
+  // per-seg totals (全集团, 按科目筛选)
+  var segTot={};
+  d.entities.forEach(function(e){
+    e.subs&&Object.keys(e.subs).forEach(function(sk){
+      if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+      var s=e.subs[sk];
+      s.buckets_usd&&Object.keys(s.buckets_usd).forEach(function(bk){segTot[bk]=(segTot[bk]||0)+s.buckets_usd[bk]});
+    });
+  });
+  var tot=segTotal(segTot);
+  var totClose=0;d.entities.forEach(function(e){totClose+=entClose(e)});
+  var nEnt=d.entities.length;
+  h+='<div class="scard"><div class="val">'+fmtU(totClose)+'</div><div class="lbl">全集团USD余额</div></div>';
+  var ov1=0;segOverKeys().forEach(function(k){ov1+=segTot[k]||0});
+  var ov3=0;segOver3Keys().forEach(function(k){ov3+=segTot[k]||0});
+    h+='<div class="scard hi"><div class="val">'+fmtU(ov1)+'</div><div class="lbl">1年以上USD</div></div>';
+    h+='<div class="scard md"><div class="val">'+fmtU(ov3)+'</div><div class="lbl">3年以上USD</div></div>';
+    h+='<div class="scard lo"><div class="val">'+fmtU(segTot.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
+    h+='<div class="scard ok"><div class="val">'+nEnt+'</div><div class="lbl">主体数</div></div>';
+    h+='</div>';
+    // 账龄结构条(全集团)
+    h+='<div class="sec"><div class="sec-t">全集团账龄结构 (USD)</div>';
+    h+=ageBar(segTot, true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
+    h+='</div>';
+    // 主体表
+    h+='<div class="sec"><div class="sec-t">主体明细</div><table class="rtable"><tr><th style="width:50px">代码</th><th>主体</th><th style="width:105px">期末余额<br>USD</th><th style="width:90px">10月变动<br>USD</th>'+segTh(85)+'<th style="width:95px">最长挂账</th><th style="width:105px">勾稽</th></tr>';
+    d.entities.forEach(function(e){
+      var segT={};
+      e.subs&&Object.keys(e.subs).forEach(function(sk){
+        if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+        var s=e.subs[sk];
+        s.buckets_usd&&Object.keys(s.buckets_usd).forEach(function(bk){segT[bk]=(segT[bk]||0)+s.buckets_usd[bk]});
+      });
+      var et=segTotal(segT);
+      var eClose=entClose(e);
+      // 10月变动: Σ该主体可见维度的 delta_usd(与 entClose 同筛选口径); 全部null→'-'
+      var eDelta=0,eHasDelta=false;
+      e.dims.forEach(function(x){
+        if(x.delta_usd!=null){eDelta+=x.delta_usd;eHasDelta=true}
+      });
+      var dCell=eHasDelta?'<td class="num" style="color:'+(eDelta>0.5?'var(--hi)':(eDelta<-0.5?'var(--ok)':'var(--tx2)'))+'">'+(eDelta>0?'+':'')+fmtU(eDelta)+'</td>':'<td class="ctr" style="color:var(--tx2)">-</td>';
+      var oldest=null;
+      e.dims.forEach(function(x){if(x.ccys){Object.keys(x.ccys).forEach(function(c){var o=x.ccys[c].oldest;if(o&&(!oldest||o<oldest))oldest=o})}});
+      var chk=nChk(e);
+      h+='<tr><td class="ctr">'+e.entity+'</td><td>'+esc(e.name)+'<div style="color:var(--tx2);font-size:10px">'+esc(e.period)+' &middot; 基准 '+esc(e.base_date)+'</div></td><td class="num">'+fmtU(eClose)+'</td>'+dCell+segCols(segT)+'</td><td class="ctr" style="font-size:11px">'+(oldest?oldest:'-')+'</td><td class="ctr">'+chk+'</td></tr>';
+    });
+    h+='</table></div>';
+  } else {
+    // 单主体视图
+    var ent=d.entities.find(function(e){return e.entity===ENTITY_FILTER});
+    if(ent){
+      h+=renderEntity(ent);
+    }
+  }
+  // 页脚免责声明
+  h+='<div style="text-align:center;color:var(--tx2);font-size:11px;margin:24px 0 8px;border-top:1px solid var(--bd);padding-top:10px">本输出为内部作业底稿，不构成专业结论，最终判断责任在企业 &middot; 数据源：金蝶明细账逐笔导出（仅供内部分析）</div>';
+  document.getElementById('app').innerHTML=h;
+  restoreOpenPanels();  // 渲染后恢复展开状态
+}
+function subsMatch(sk){return sk.indexOf(SUBJECT_FILTER)===0}
+function segTotal(t){var s=0;segKeys().forEach(function(k){s+=t[k]||0});return s}
+function subClose(s){return s.close_usd!=null?s.close_usd:segTotal(s.buckets_usd||{})}
+function entClose(e){var t=0;Object.keys(e.subs||{}).forEach(function(sk){if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;t+=subClose(e.subs[sk])});return t}
+function segCols(t){
+  var h='';
+  var first=segKeys()[0];
+  segKeys().forEach(function(k){
+    h+='<td class="num'+((t[k]||0)>0&&k!==first?' neg':'')+'">'+fmtU(t[k]||0)+'</td>';
+  });
+  return h;
+}
+function segTh(w){ return SEGS.map(function(s){return '<th style="width:'+w+'px">'+s[1]+'</th>'}).join(''); }
+function ageBar(t, showLegend){
+  var tot=segTotal(t);
+  if(tot<=0)return '<div style="color:var(--tx2);font-size:12px">无余额</div>';
+  var h='<div class="agebar">';
+  SEGS.forEach(function(s){
+    var v=t[s[0]]||0;
+    if(v<=0)return;
+    var w=(v/tot*100).toFixed(2)+'%';
+    h+='<div style="width:'+w+'%;background:'+s[2]+'" title="'+s[1]+': '+fmtU(v)+'"></div>';
+  });
+  h+='</div>';
+  return h;
+}
+function nChk(e){
+  if(!e.checks||!e.checks.length)return '<span class="chk-ok">✓</span>';
+  var bad=e.checks.filter(function(c){return !c.ok}).length;
+  if(bad===0)return '<span class="chk-ok">✓'+e.checks.length+'组</span>';
+  return '<span class="chk-bad">✗'+bad+'/'+e.checks.length+'</span>';
+}
+function renderEntity(ent){
+  var h='';
+  // 概览卡片
+  h+='<div class="summary-grid">';
+  var segT={};
+  ent.subs&&Object.keys(ent.subs).forEach(function(sk){
+    if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+    var s=ent.subs[sk];
+    s.buckets_usd&&Object.keys(s.buckets_usd).forEach(function(bk){segT[bk]=(segT[bk]||0)+s.buckets_usd[bk]});
+  });
+  var tot=segTotal(segT);
+  var ov1=0;segOverKeys().forEach(function(k){ov1+=segT[k]||0});
+  var ov3=0;segOver3Keys().forEach(function(k){ov3+=segT[k]||0});
+  h+='<div class="scard"><div class="val">'+fmtU(entClose(ent))+'</div><div class="lbl">期末余额USD</div></div>';
+  // 10月变动卡(2026-11-09): Σ维度 delta_usd; 全null(无增量)显示'-'
+  var eDelta=0,eHasDelta=false;
+  ent.dims.forEach(function(x){if(x.delta_usd!=null){eDelta+=x.delta_usd;eHasDelta=true}});
+  if(eHasDelta){
+    h+='<div class="scard '+(eDelta>0.5?'hi':(eDelta<-0.5?'ok':''))+'"><div class="val">'+(eDelta>0?'+':'')+fmtU(eDelta)+'</div><div class="lbl">10月变动USD</div></div>';
+  }else{
+    h+='<div class="scard"><div class="val">-</div><div class="lbl">10月变动USD</div></div>';
+  }
+  h+='<div class="scard hi"><div class="val">'+fmtU(ov1)+'</div><div class="lbl">1年以上USD</div></div>';
+  h+='<div class="scard md"><div class="val">'+fmtU(ov3)+'</div><div class="lbl">3年以上USD</div></div>';
+  h+='<div class="scard lo"><div class="val">'+fmtU(segT.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
+  h+='<div class="scard ok"><div class="val">'+ent.dims.length+'</div><div class="lbl">往来维度数</div></div>';
+  h+='</div>';
+  // 该主体输入体检告警
+  if(ent.warnings&&ent.warnings.length){
+    h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 该主体输入体检告警</b><div style="color:var(--tx2);margin-top:4px">'+ent.warnings.map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
+  }
+  // 结构条
+  h+='<div class="sec"><div class="sec-t">'+esc(ent.name)+' 账龄结构 (USD)</div>';
+  h+=ageBar(segT,true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
+  h+='</div>';
+  // 科目区块
+  h+='<div class="sec"><div class="sec-t">账龄明细表 (点击维度行展开逐笔构成)</div>';
+  Object.keys(ent.subs).forEach(function(sk){
+    if(SUBJECT_FILTER!=='ALL'&&!subsMatch(sk))return;
+    var s=ent.subs[sk];
+    if(segTotal(s.buckets_usd||{})<=0 && !s.dims.length)return;
+    // 科目下无任何可见维度(全部余额为0且无备注) → 整个面板隐藏(2026-10-21)
+    var visDims=ent.dims.filter(function(x){return x.sub===sk && (Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5 || NOTES[ent.entity+'-'+x.sub+'-'+x.name])});
+    if(!visDims.length && segTotal(s.buckets_usd||{})<=0)return;    h+='<div class="dpanel" id="sub_'+sk.replace(/\./g,'_')+'">';
+    h+='<div class="dhdr" onclick="toggleP(this)"><h3>'+sk+' '+esc(s.name)+'</h3><div><span class="badge '+(overRatio(s)>0.5?'hi':(overRatio(s)>0.2?'md':'lo'))+'">'+fmtU(subClose(s))+' USD</span></div></div>';
+    h+='<div class="dbody">';
+    h+='<table class="rtable"><tr><th style="width:210px">往来对象</th><th style="width:95px">期末余额<br>USD</th><th style="width:85px">10月变动<br>USD</th>'+segTh(75)+'<th style="width:85px">最长挂账</th><th style="width:85px">最后交易</th><th style="width:70px">是否可催</th><th style="width:70px">BP介入</th><th style="width:100px">备注</th></tr>';
+    // 隐藏余额为0的维度(2026-10-21): 期末余额(USD口径)为0/无余额的往来对象不显示,
+    // 减少无效行; 有备注的保留(避免已填信息"消失")
+    // 是否可催筛选(2026-11-02): YES=标记"是", NO=标记"否", NONE=未标记; 有可催标记的行始终保留
+    var collKey=function(x){return ent.entity+'-'+x.sub+'-'+x.name};
+    var collMatch=function(x){var cv=COLL[collKey(x)];if(COLL_FILTER==='YES')return cv==='是';if(COLL_FILTER==='NO')return cv==='否';if(COLL_FILTER==='NONE')return !cv;return true};
+    var bpMatch=function(x){var bv=BP[collKey(x)];if(BP_FILTER==='YES')return bv==='是';if(BP_FILTER==='NO')return bv==='否';if(BP_FILTER==='NONE')return !bv;return true};  // BP介入筛选(2026-11-10)
+    var dlAll=ent.dims.filter(function(x){return x.sub===sk && Math.abs((x.close_usd!=null?x.close_usd:x.total_usd)||0)>0.5});  // 2026-11-11 用户确认: 期末余额=0 一律不展示(备注/标记数据云端保留, 维度再有余额时自动带出)
+    dlAll=dlAll.filter(collMatch);
+    dlAll=dlAll.filter(bpMatch);
+    if(!dlAll.length)return;  // 该科目无可催筛选命中的行 → 隐藏面板
+    dlAll.sort(function(a,b){return Math.abs(b.close_usd||b.total_usd||0)-Math.abs(a.close_usd||a.total_usd||0)});
+    dlAll.forEach(function(x){
+      var baseUsd=(x.close_usd!=null?x.close_usd:x.total_usd)||0;
+      var t={};
+      Object.keys(x.ccys||{}).forEach(function(c){var su=x.ccys[c].segs_usd; if(su)Object.keys(su).forEach(function(bk){t[bk]=(t[bk]||0)+su[bk]})});
+      var oldest=null,lastTx=null;
+      Object.keys(x.ccys||{}).forEach(function(c){var cc=x.ccys[c];if(cc.oldest&&(!oldest||cc.oldest<oldest))oldest=cc.oldest;if(cc.last_tx&&(!lastTx||cc.last_tx>lastTx))lastTx=cc.last_tx});
+      var int= isInternal(x.name);
+      var nk=ent.entity+'-'+x.sub+'-'+x.name;
+      var noteVal=NOTES[nk]||_drafts[nk]||'';  // 正式值优先, 草稿兜底(未保存的半截字)
+      var cv=COLL[nk]||'';  // 是/否/''(未标记)
+      var bpv=BP[nk]||'';    // BP介入: 是/否/''(2026-11-10)
+      // 10月变动(2026-11-09): delta_usd=期末-上月末(带方向符号); null=无增量对比显示'-'
+      var dv=x.delta_usd;
+      var dCell;
+      if(dv==null){dCell='<td class="ctr" style="color:var(--tx2)">-</td>'}
+      else{
+        var dCol=dv>0.5?'var(--hi)':(dv<-0.5?'var(--ok)':'var(--tx2)');  // 涨红跌绿(中文口径)
+        dCell='<td class="num" style="color:'+dCol+'">'+(dv>0?'+':'')+fmtU(dv)+'</td>';
+      }
+      h+='<tr><td>'+esc(x.name)+(int?' <span class="badge lo" style="font-size:10px">集团内</span>':'')+'</td><td class="num'+(baseUsd<0?' neg':'')+'">'+fmtU(baseUsd)+'</td>'+dCell+segCols(t)+'</td><td class="ctr" style="font-size:10px">'+(oldest||'-')+'</td><td class="ctr" style="font-size:10px">'+(lastTx||'-')+'</td><td style="text-align:center"><select class="coll-sel" onchange="setColl(\''+esc(nk)+'\',this.value)"><option value=""'+(cv===''?' selected':'')+'>-</option><option value="是"'+(cv==='是'?' selected':'')+'>是</option><option value="否"'+(cv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><select class="coll-sel" onchange="setBp(\''+esc(nk)+'\',this.value)"><option value=""'+(bpv===''?' selected':'')+'>-</option><option value="是"'+(bpv==='是'?' selected':'')+'>是</option><option value="否"'+(bpv==='否'?' selected':'')+'>否</option></select></td><td style="text-align:center"><div style="display:flex;gap:3px;align-items:center"><input type="text" class="note-input" style="flex:1;min-width:0" value="'+esc(noteVal)+'" placeholder="备注" oninput="saveDraft(\''+esc(nk)+'\',this.value)" onchange="setNote(\''+esc(nk)+'\',this.value)">'+(NOTES[nk]?'<button title="删除备注" onclick="delNote(\''+esc(nk)+'\')" style="padding:2px 6px;border:1px solid var(--bd);background:var(--sf);color:var(--hi);border-radius:3px;cursor:pointer;font-size:11px;flex:none">&#10005;</button>':'')+'</div></td></tr>';
+    });
+    h+='</table>';
+    h+='</div></div>';
+  });
+  h+='</div>';
+  // 勾稽校验条
+  h+='<div class="sec"><div class="sec-t">勾稽校验</div>';
+  var bad=ent.checks.filter(function(c){return !c.ok});
+  h+='<div style="font-size:12px;color:'+(bad.length?'var(--hi)':'var(--ok)')+'">'+(bad.length?'✗ '+bad.length+' 组不平: '+bad.slice(0,5).map(function(c){return esc(c.dim.slice(0,20))+' diff='+fmt(c.diff)}).join('; '):'✓ 全部 '+ent.checks.length+' 组勾稽通过 (期初+Σ借−Σ贷=期末, 差异<1)')+'</div>';
+  h+='</div>';
+  // 期初遗留明细 (仅真实开账结转记录)
+  var ol=ent.open_legacy||[];
+  if(ol.length){
+    h+='<div class="sec"><div class="sec-t">期初遗留明细 (开账时点结转余额, 无发生日期; 期末尚存=本期间未冲销部分, 不计入账龄区间)</div>';
+    h+='<table class="rtable"><tr><th style="width:90px">科目</th><th>往来维度</th><th style="width:130px">开账结转<br>(本位币)</th><th style="width:50px">方向</th><th style="width:130px">期末尚存<br>(本位币)</th><th style="width:110px">期末尚存<br>USD</th><th style="width:70px">状态</th></tr>';
+    ol.forEach(function(r){
+      if(SUBJECT_FILTER!=='ALL'&&r.sub&&!subsMatch(r.sub))return;
+      var agg=!r.dim;
+      var cleared=Math.abs(r.surv||0)<0.01;
+      h+='<tr'+(agg?' style="color:var(--tx2)"':'')+'><td class="ctr">'+esc(r.sub||'')+'</td><td>'+(agg?'(科目汇总 = 各维度合计)':esc(r.dim))+'</td><td class="num">'+fmt(r.amt)+'</td><td class="ctr">'+esc(r.dir||'')+'</td><td class="num">'+fmt(r.surv||0)+'</td><td class="num">'+fmtU(r.usd||0)+'</td><td class="ctr" style="color:'+(cleared?'var(--ok)':'var(--hi)')+'">'+(cleared?'已结清':'未结清')+'</td></tr>';
+    });
+    h+='</table></div>';
+  }
+  return h;
+}
+function overRatio(s){var t=segTotal(s.buckets_usd||{});if(t<=0)return 0;var o=0;segOverKeys().forEach(function(k){o+= (s.buckets_usd||{})[k]||0});return o/t}
+// 展开状态保持: 30s轮询触发 render() 全量重建 innerHTML 会冲掉 .open class,
+// 导致"点开明细表几秒后自动收起"。渲染前记录展开的 panel id, 渲染后恢复。
+var OPEN_PANELS={};
+function snapshotOpenPanels(){
+  OPEN_PANELS={};
+  var ps=document.querySelectorAll('.dpanel.open');
+  for(var i=0;i<ps.length;i++){if(ps[i].id)OPEN_PANELS[ps[i].id]=1}
+}
+function restoreOpenPanels(){
+  for(var id in OPEN_PANELS){var el=document.getElementById(id);if(el)el.classList.add('open')}
+}
+function toggleP(el){
+  el.parentElement.classList.toggle('open');
+  // 同步记录, 避免快照间隙的点击丢失
+  if(el.parentElement.id){
+    if(el.parentElement.classList.contains('open')){OPEN_PANELS[el.parentElement.id]=1}
+    else{delete OPEN_PANELS[el.parentElement.id]}
+  }
+}
+function hardReset(){
+  // 一键修复(2026-11-09): 清掉本看板存在 localStorage 的旧缓存数据与旧token,
+  // 强制重载。重载后无token会显示"无法加载数据"指引, 用户用完整链接打开即好。
+  try{
+    // 2026-11-11: agingDrafts(草稿)不清 — 草稿只在本地, 清了就真丢; 其余缓存可清(云端有正本)
+    ['_agingCachedData','agingNotes','agingColl','gh_token','pw_ok'].forEach(function(k){localStorage.removeItem(k)});
+  }catch(e){}
+  try{sessionStorage.removeItem('pw_ok');sessionStorage.removeItem('pw')}catch(e){}
+  location.reload();
+}
+function setEntity(v){ENTITY_FILTER=v||null;render()}
+function setSubject(v){SUBJECT_FILTER=v||'ALL';render()}
+function setCur(v){CUR_FILTER=v||'USD';render()}
+function setCollF(v){COLL_FILTER=v||'ALL';render()}
+function setBpF(v){BP_FILTER=v||'ALL';render()}
+if(!_pwBlocked)init();
+
+</script>
+</body>
+</html>
