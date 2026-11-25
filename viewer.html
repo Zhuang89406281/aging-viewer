@@ -645,16 +645,17 @@ function renderEntity(ent){
   var bad=ent.checks.filter(function(c){return !c.ok});
   h+='<div style="font-size:12px;color:'+(bad.length?'var(--hi)':'var(--ok)')+'">'+(bad.length?'✗ '+bad.length+' 组不平: '+bad.slice(0,5).map(function(c){return esc(c.dim.slice(0,20))+' diff='+fmt(c.diff)}).join('; '):'✓ 全部 '+ent.checks.length+' 组勾稽通过 (期初+Σ借−Σ贷=期末, 差异<1)')+'</div>';
   h+='</div>';
-  // 期初遗留明细 (仅真实开账结转记录)
+  // 期初遗留明细 (开账结转 + 余额表补挂; 期末尚存=本期间未冲销部分, 不计入账龄区间)
   var ol=ent.open_legacy||[];
   if(ol.length){
-    h+='<div class="sec"><div class="sec-t">期初遗留明细 (开账时点结转余额, 无发生日期; 期末尚存=本期间未冲销部分, 不计入账龄区间)</div>';
-    h+='<table class="rtable"><tr><th style="width:90px">科目</th><th>往来维度</th><th style="width:130px">开账结转<br>(本位币)</th><th style="width:50px">方向</th><th style="width:130px">期末尚存<br>(本位币)</th><th style="width:110px">期末尚存<br>USD</th><th style="width:70px">状态</th></tr>';
+    h+='<div class="sec"><div class="sec-t">期初遗留明细 (无法按逐笔日期分档的存量: 开账结转余额 / 余额表对齐补挂; 期末尚存=本期间未冲销部分, 不计入账龄区间)</div>';
+    h+='<table class="rtable"><tr><th style="width:90px">科目</th><th>往来维度</th><th style="width:78px">来源</th><th style="width:130px">结转金额<br>(本位币)</th><th style="width:50px">方向</th><th style="width:130px">期末尚存<br>(本位币)</th><th style="width:110px">期末尚存<br>USD</th><th style="width:70px">状态</th></tr>';
     ol.forEach(function(r){
       if(SUBJECT_FILTER!=='ALL'&&r.sub&&!subsMatch(r.sub))return;
       var agg=!r.dim;
       var cleared=Math.abs(r.surv||0)<0.01;
-      h+='<tr'+(agg?' style="color:var(--tx2)"':'')+'><td class="ctr">'+esc(r.sub||'')+'</td><td>'+(agg?'(科目汇总 = 各维度合计)':esc(r.dim))+'</td><td class="num">'+fmt(r.amt)+'</td><td class="ctr">'+esc(r.dir||'')+'</td><td class="num">'+fmt(r.surv||0)+'</td><td class="num">'+fmtU(r.usd||0)+'</td><td class="ctr" style="color:'+(cleared?'var(--ok)':'var(--hi)')+'">'+(cleared?'已结清':'未结清')+'</td></tr>';
+      var srcTxt=(r.src==='balance')?'余额表补挂':'开账结转';
+      h+='<tr'+(agg?' style="color:var(--tx2)"':'')+'><td class="ctr">'+esc(r.sub||'')+'</td><td>'+(agg?'(科目汇总 = 各维度合计)':esc(r.dim))+'</td><td class="ctr" style="font-size:11px;color:var(--tx2)">'+srcTxt+'</td><td class="num">'+fmt(r.amt)+'</td><td class="ctr">'+esc(r.dir||'')+'</td><td class="num">'+fmt(r.surv||0)+'</td><td class="num">'+fmtU(r.usd||0)+'</td><td class="ctr" style="color:'+(cleared?'var(--ok)':'var(--hi)')+'">'+(cleared?'已结清':'未结清')+'</td></tr>';
     });
     h+='</table></div>';
   }
