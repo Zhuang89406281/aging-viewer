@@ -403,13 +403,21 @@ function render(){
   segInit();
   snapshotOpenPanels();  // 渲染前记录展开状态(轮询重渲染不丢)
   var d=DATA;
+  // 告警已不渲染到页面, 但保留可检索入口: 控制台执行 __AGING_WARNINGS 查看全量
+  if(!window.__AGING_WARNINGS){
+    try{
+      var _w={meta:(d.meta.warnings||[]).slice()};
+      d.entities.forEach(function(e){ if(e.warnings&&e.warnings.length){ _w[e.entity]=e.warnings.slice(); } });
+      window.__AGING_WARNINGS=_w;
+    }catch(e){}
+  }
   var h='';
   h+='<div class="hdr"><h1>往来账龄分析看板</h1><div class="sub">1123 预付账款 / 1221 其他应收款 &middot; 逐笔FIFO &middot; 截止各主体最新账月 &middot; 数据构建: '+esc(d.meta.built.slice(0,10))+' &middot; 汇率月份: '+esc(d.meta.fx_month)+' <span class="sync-dot '+( _ghAvailable?'on':'off')+'" id="syncDot"></span></div></div>';
-  // 基准日 / 覆盖度 / 告警条
+  // 基准日 / 覆盖度 (2026-11-25: 去掉告警图标, 基准日差异改为中性说明)
   h+='<div class="sub" style="text-align:center;font-size:12px;margin-top:-4px">';
   if(d.meta.base_date_min){
     if(d.meta.base_date_mixed){
-      h+='<span style="color:var(--md)">&#9888; 各主体基准日不一致：'+esc(d.meta.base_date_min)+' ~ '+esc(d.meta.base_date_max)+'（全集团汇总为各主体各自最新账月末加总，非同一时点，仅供参考）</span>';
+      h+='<span style="color:var(--tx2)">各主体基准日：'+esc(d.meta.base_date_min)+' ~ '+esc(d.meta.base_date_max)+'（全集团汇总为各主体各自最新账月末加总，非同一时点，仅供参考）</span>';
     }else{
       h+='<span style="color:var(--tx2)">全集团统一基准日：'+esc(d.meta.base_date_min)+'</span>';
     }
@@ -419,9 +427,10 @@ function render(){
   if(_staleData){
     h+='<div class="sec" style="border:1px solid var(--hi);border-radius:8px;padding:8px 12px;background:var(--hi-bg);font-size:12px"><b style="color:var(--hi)">&#9888; 云端数据拉取失败, 当前显示的是浏览器本地旧缓存(数据构建: '+esc(d.meta.built.slice(0,10))+')</b><div style="color:var(--tx2);margin-top:4px">失败原因: '+esc(_staleReason||'未知')+'(401=token失效, 网络错误=无法连接GitHub)</div><div style="color:var(--tx2);margin-top:4px;display:flex;align-items:center;gap:10px"><button onclick="hardReset()" style="padding:4px 14px;background:var(--hi);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">一键修复(清缓存重载)</button><span>修复后若仍失败, 请用含 token 的完整链接重新打开</span></div></div>';
   }
-  if(d.meta.warnings&&d.meta.warnings.length){
-    h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 输入体检告警 '+d.meta.warnings.length+' 条</b><div style="color:var(--tx2);margin-top:4px">'+d.meta.warnings.slice(0,20).map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
-  }
+  // 2026-11-25 用户要求: 看板不再显示"输入体检告警"(665 条技术性噪音, 如
+  // "余额表有 133 行币种明细已折叠")。告警数据仍完整保留在 viewer_data.json 的
+  // meta.warnings / entities[].warnings 里, 供 audit_consistency.py 等审计脚本使用;
+  // 排查时在浏览器控制台执行 __AGING_WARNINGS 可取到全量(见 render 开头的挂载)。
   // 筛选区
   h+='<div class="fbar">';
   h+='<label>主体:</label><select class="fsel" id="entSel" onchange="setEntity(this.value)">';
@@ -578,10 +587,7 @@ function renderEntity(ent){
   h+='<div class="scard lo"><div class="val">'+fmtU(segT.open_legacy||0)+'</div><div class="lbl">期初遗留USD</div></div>';
   h+='<div class="scard ok"><div class="val">'+ent.dims.length+'</div><div class="lbl">往来维度数</div></div>';
   h+='</div>';
-  // 该主体输入体检告警
-  if(ent.warnings&&ent.warnings.length){
-    h+='<div class="sec" style="border:1px solid var(--md);border-radius:8px;padding:8px 12px;background:var(--sf);font-size:12px"><b style="color:var(--md)">&#9888; 该主体输入体检告警</b><div style="color:var(--tx2);margin-top:4px">'+ent.warnings.map(function(w){return '&middot; '+esc(w)}).join('<br>')+'</div></div>';
-  }
+  // 2026-11-25: 主体级"输入体检告警"块已按用户要求下线(数据仍保留在 JSON 里)
   // 结构条
   h+='<div class="sec"><div class="sec-t">'+esc(ent.name)+' 账龄结构 (USD)</div>';
   h+=ageBar(segT,true)+'<div class="legend">'+SEGS.map(function(s){return '<i style="background:'+s[2]+'"></i>'+s[1]}).join('')+'</div>';
