@@ -391,8 +391,8 @@ function segOver3Keys(){
 }
 
 var CCYN={USD:'USD',NGN:'NGN(奈拉)',CNY:'CNY(人民币)',KES:'KES(先令)',TZS:'TZS(先令)',XOF:'XOF(西非法郎)',XAF:'XAF(中非法郎)',HKD:'HKD',GBP:'GBP',EUR:'EUR',GHS:'GHS(塞地)',PKR:'PKR',UGX:'UGX',RWF:'RWF',BASE:'本位币'};
-function fmt(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e4)return(n/1e3).toFixed(1)+'K';return a<1&&a>0?'0.01':Math.round(a).toLocaleString()}
-function fmtU(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return a<1?'0':Math.round(a).toLocaleString()}
+function fmt(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e4)return(n/1e3).toFixed(1)+'K';if(a<1)return a>0?(n<0?'-0.01':'0.01'):'0';return(n<0?'-':'')+Math.round(a).toLocaleString()}
+function fmtU(n){if(n==null)return'-';n=Number(n);var a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';if(a<1)return(n<0?'-0':'0');return(n<0?'-':'')+Math.round(a).toLocaleString()}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function dimLabel(nm){var m=String(nm||'').match(/^[A-Z0-9]+[-_]?(.*)$/);return nm}
 function isInternal(nm){return /^[0-9]{3}[-_]/.test(String(nm||''))}
